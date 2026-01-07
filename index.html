@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Actas (Depuración)</title>
+    <style>
+        :root { --primary: #0078d4; --bg: #f3f2f1; --card: #fff; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { width: 100%; max-width: 1200px; display: flex; gap: 20px; height: 85vh; }
+        .column { flex: 1; background: var(--card); padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        h2 { color: var(--primary); font-size: 1.1rem; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
+        .btn { background: var(--primary); color: white; border: none; padding: 10px; width: 100%; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: bold; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        .btn:hover:not(:disabled) { background: #005a9e; }
+        textarea { flex: 1; width: 100%; border: 1px solid #ccc; border-radius: 4px; padding: 10px; font-family: monospace; resize: none; margin-top: 10px; box-sizing: border-box; }
+        #status-bar { width: 100%; max-width: 1200px; text-align: center; margin-bottom: 10px; font-weight: bold; min-height: 20px; }
+    </style>
+</head>
+<body>
+
+    <div id="status-bar">Listo. Carga un archivo para empezar.</div>
+
+    <div class="container">
+        
+        <div class="column">
+            <h2>1. Cargar Archivo</h2>
+            <label><strong>PDF (Escaneado)</strong></label>
+            <input type="file" id="pdf-input" accept=".pdf" style="margin-top: 5px;">
+            <button class="btn" onclick="extractData('extract-pdf', 'pdf-input')">Extraer Datos</button>
+            <hr style="width: 100%; border: 0; border-top: 1px dashed #ccc; margin: 20px 0;">
+            <label><strong>Transcripción (.txt)</strong></label>
+            <input type="file" id="txt-input" accept=".txt" style="margin-top: 5px;">
+            <button class="btn" onclick="extractData('extract-transcript', 'txt-input')">Extraer Texto</button>
+        </div>
+
+        <div class="column">
+            <h2>2. Resultado (JSON)</h2>
+            <textarea id="json-editor" placeholder="Resultado..."></textarea>
+            <button class="btn" id="btn-draft" onclick="generateDraft()" disabled>➡️ Redactar Borrador</button>
+        </div>
+
+        <div class="column">
+            <h2>3. Acta Final</h2>
+            <textarea id="text-editor" placeholder="Editor..."></textarea>
+            <button class="btn" id="btn-download" onclick="downloadFinalDocx()" disabled style="background-color: #107c10;">⬇️ Descargar</button>
+        </div>
+    </div>
+
+    <script>
+        const API = "https://api-experto-en-actas.salmonflower-73fd32d3.eastus.azurecontainerapps.io";
+        const status = document.getElementById('status-bar');
+        const jsonArea = document.getElementById('json-editor');
+        const textArea = document.getElementById('text-editor');
+        const btnDraft = document.getElementById('btn-draft');
+        const btnDownload = document.getElementById('btn-download');
+
+        function setStatus(msg, color = 'black') {
+            status.textContent = msg;
+            status.style.color = color;
+        }
+
+        async function extractData(endpoint, inputId) {
+            const file = document.getElementById(inputId).files[0];
+            if (!file) return setStatus("⚠️ Selecciona un archivo.", "red");
+
+            setStatus("⏳ Procesando... Por favor espera.", "#0078d4");
+            jsonArea.value = "Cargando...";
+            textArea.value = "";
+            btnDraft.disabled = true;
+
+            const form = new FormData();
+            form.append("files", file);
+
+            try {
+                const res = await fetch(`${API}/${endpoint}`, { method: 'POST', body: form });
+                const data = await res.json();
+                
+                // Ahora verificamos si hay error explícito en la respuesta
+                if (data.results && data.results.length > 0) {
+                    const resultItem = data.results[0];
+                    
+                    if (resultItem.error) {
+                        // SI EL BACKEND DEVUELVE ERROR, LO MOSTRAMOS
+                        throw new Error(`Backend Error: ${resultItem.error}`);
+                    }
+                    
+                    if (resultItem.data) {
+                        jsonArea.value = JSON.stringify(resultItem.data, null, 4);
+                        setStatus("✅ Éxito. Revisa el JSON.", "green");
+                        btnDraft.disabled = false;
+                    } else {
+                        throw new Error("Respuesta vacía (sin datos ni error).");
+                    }
+                } else {
+                    throw new Error("Formato de respuesta desconocido.");
+                }
+
+            } catch (e) {
+                console.error(e);
+                setStatus(`❌ FALLÓ: ${e.message}`, "red");
+                jsonArea.value = `DETALLE DEL ERROR:\n${e.message}`;
+            }
+        }
+
+        async function generateDraft() {
+            try {
+                const jsonData = JSON.parse(jsonArea.value);
+                setStatus("⏳ Redactando...", "#0078d4");
+                const res = await fetch(`${API}/draft-minutes`, {
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ extracted_data: jsonData })
+                });
+                const data = await res.json();
+                if (data.draft_text) {
+                    textArea.value = data.draft_text;
+                    setStatus("✅ Borrador listo.", "green");
+                    btnDownload.disabled = false;
+                } else { throw new Error(data.detail || "Error redactando"); }
+            } catch (e) { setStatus(`❌ Error: ${e.message}`, "red"); }
+        }
+
+        async function downloadFinalDocx() {
+            const finalContent = textArea.value;
+            setStatus("⏳ Descargando...", "#0078d4");
+            try {
+                const res = await fetch(`${API}/create-docx`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ markdown_text: finalContent })
+                });
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = "Acta_Final.docx";
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setStatus("🎉 Listo.", "green");
+                } else { throw new Error("Error al crear archivo"); }
+            } catch (e) { setStatus(`❌ Error descarga: ${e.message}`, "red"); }
+        }
+    </script>
+</body>
+</html>
