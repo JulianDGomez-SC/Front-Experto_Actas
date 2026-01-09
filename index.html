@@ -3,145 +3,204 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generador de Actas (Depuración)</title>
+    <title>Gestor de Actas con IA (RAG)</title>
     <style>
-        :root { --primary: #0078d4; --bg: #f3f2f1; --card: #fff; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .container { width: 100%; max-width: 1200px; display: flex; gap: 20px; height: 85vh; }
-        .column { flex: 1; background: var(--card); padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
-        h2 { color: var(--primary); font-size: 1.1rem; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
-        .btn { background: var(--primary); color: white; border: none; padding: 10px; width: 100%; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: bold; }
-        .btn:disabled { background: #ccc; cursor: not-allowed; }
-        .btn:hover:not(:disabled) { background: #005a9e; }
-        textarea { flex: 1; width: 100%; border: 1px solid #ccc; border-radius: 4px; padding: 10px; font-family: monospace; resize: none; margin-top: 10px; box-sizing: border-box; }
-        #status-bar { width: 100%; max-width: 1200px; text-align: center; margin-bottom: 10px; font-weight: bold; min-height: 20px; }
+        body { font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f4f7f6; color: #333; }
+        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        h1, h2 { text-align: center; color: #2c3e50; margin-bottom: 20px; }
+        h1 { border-bottom: 2px solid #3498db; padding-bottom: 15px; display: inline-block; width: 100%; }
+        
+        /* Estilos de Subida */
+        .upload-section { text-align: center; border: 2px dashed #bdc3c7; border-radius: 10px; padding: 40px; transition: 0.3s; background: #fafafa; }
+        .upload-section:hover { border-color: #3498db; background: #f0f8ff; }
+        .btn-primary { background-color: #3498db; color: white; border: none; padding: 12px 25px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 15px; transition: 0.2s; }
+        .btn-primary:hover { background-color: #2980b9; transform: translateY(-1px); }
+        .btn-primary:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        
+        #fileName { color: #7f8c8d; margin-top: 10px; font-style: italic; }
+        
+        /* Resultados de Subida */
+        #resultadoUpload { margin-top: 20px; padding: 20px; border-radius: 8px; background-color: #f8f9fa; border-left: 5px solid #2ecc71; display: none; }
+        .data-label { font-weight: bold; color: #2c3e50; }
+        
+        /* Estilos del Chat */
+        .chat-container { display: flex; flex-direction: column; gap: 15px; }
+        .input-group { display: flex; gap: 10px; }
+        input[type="text"] { flex-grow: 1; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; outline: none; transition: 0.3s; }
+        input[type="text"]:focus { border-color: #3498db; box-shadow: 0 0 5px rgba(52,152,219,0.3); }
+        
+        .chat-response-box { background-color: #eefbfb; padding: 20px; border-radius: 8px; border-left: 5px solid #00b894; display: none; animation: fadeIn 0.5s; }
+        .source-box { margin-top: 15px; padding-top: 10px; border-top: 1px solid #d1d8e0; font-size: 0.9em; }
+        .source-link { color: #0984e3; text-decoration: none; display: block; margin-bottom: 5px; }
+        .source-link:hover { text-decoration: underline; }
+
+        /* Animación de Carga */
+        .loading { display: none; text-align: center; color: #7f8c8d; margin: 15px 0; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px auto; }
+        
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
-    <div id="status-bar">Listo. Carga un archivo para empezar.</div>
+    <div class="container">
+        <h1>📂 Centro de Carga de Actas</h1>
+        <p style="text-align: center; color: #666;">Sube tus actas en PDF para que la IA las lea, extraiga la fecha real y las guarde en la base de conocimientos.</p>
+        
+        <div class="upload-section" onclick="document.getElementById('fileInput').click()">
+            <p style="font-size: 1.2em; color: #2c3e50;">Haz clic aquí para seleccionar tu PDF</p>
+            <span style="font-size: 3em;">📄</span>
+            <input type="file" id="fileInput" accept=".pdf" style="display: none" onchange="mostrarNombre()">
+        </div>
+        
+        <div style="text-align: center;">
+            <p id="fileName"></p>
+            <button class="btn-primary" onclick="procesarActa()">🚀 Procesar e Indexar Acta</button>
+        </div>
+
+        <div id="loadingUpload" class="loading">
+            <div class="spinner"></div>
+            <p>Analizando documento, extrayendo fechas y guardando en Azure AI Search...</p>
+        </div>
+
+        <div id="resultadoUpload"></div>
+    </div>
 
     <div class="container">
+        <h2>🤖 Chat con tus Documentos</h2>
+        <p style="text-align: center; color: #666;">Pregunta sobre acuerdos, fechas o asistentes. La IA buscará la respuesta exacta en tus archivos.</p>
         
-        <div class="column">
-            <h2>1. Cargar Archivo</h2>
-            <label><strong>PDF (Escaneado)</strong></label>
-            <input type="file" id="pdf-input" accept=".pdf" style="margin-top: 5px;">
-            <button class="btn" onclick="extractData('extract-pdf', 'pdf-input')">Extraer Datos</button>
-            <hr style="width: 100%; border: 0; border-top: 1px dashed #ccc; margin: 20px 0;">
-            <label><strong>Transcripción (.txt)</strong></label>
-            <input type="file" id="txt-input" accept=".txt" style="margin-top: 5px;">
-            <button class="btn" onclick="extractData('extract-transcript', 'txt-input')">Extraer Texto</button>
+        <div class="chat-container">
+            <div class="input-group">
+                <input type="text" id="preguntaInput" placeholder="Ej: ¿Cuáles fueron los acuerdos de la reunión del 15 de octubre?" onkeypress="handleEnter(event)">
+                <button class="btn-primary" onclick="preguntarChat()">🔍 Buscar</button>
+            </div>
         </div>
 
-        <div class="column">
-            <h2>2. Resultado (JSON)</h2>
-            <textarea id="json-editor" placeholder="Resultado..."></textarea>
-            <button class="btn" id="btn-draft" onclick="generateDraft()" disabled>➡️ Redactar Borrador</button>
+        <div id="loadingChat" class="loading">
+            <div class="spinner"></div>
+            <p>Consultando la base de conocimientos...</p>
         </div>
 
-        <div class="column">
-            <h2>3. Acta Final</h2>
-            <textarea id="text-editor" placeholder="Editor..."></textarea>
-            <button class="btn" id="btn-download" onclick="downloadFinalDocx()" disabled style="background-color: #107c10;">⬇️ Descargar</button>
+        <div id="chatResponse" class="chat-response-box">
+            <h3 style="margin-top: 0; color: #2d3436;">Respuesta:</h3>
+            <p id="chatText" style="line-height: 1.6; white-space: pre-wrap;"></p>
+            
+            <div id="chatSources" class="source-box">
+                <strong>📚 Fuentes consultadas:</strong>
+                <div id="sourcesList"></div>
+            </div>
         </div>
     </div>
 
     <script>
-        const API = "https://api-experto-en-actas.salmonflower-73fd32d3.eastus.azurecontainerapps.io";
-        const status = document.getElementById('status-bar');
-        const jsonArea = document.getElementById('json-editor');
-        const textArea = document.getElementById('text-editor');
-        const btnDraft = document.getElementById('btn-draft');
-        const btnDownload = document.getElementById('btn-download');
+        // --- CONFIGURACIÓN ---
+        // Pega aquí la URL exacta que aparece en tus logs de Container Apps
+        // Asegúrate de que NO tenga una barra "/" al final
+        const API_URL = "https://api-experto-en-actas.salmonflower-73fd32d3.eastus.azurecontainerapps.io"; 
 
-        function setStatus(msg, color = 'black') {
-            status.textContent = msg;
-            status.style.color = color;
-        }
-
-        async function extractData(endpoint, inputId) {
-            const file = document.getElementById(inputId).files[0];
-            if (!file) return setStatus("⚠️ Selecciona un archivo.", "red");
-
-            setStatus("⏳ Procesando... Por favor espera.", "#0078d4");
-            jsonArea.value = "Cargando...";
-            textArea.value = "";
-            btnDraft.disabled = true;
-
-            const form = new FormData();
-            form.append("files", file);
-
-            try {
-                const res = await fetch(`${API}/${endpoint}`, { method: 'POST', body: form });
-                const data = await res.json();
-                
-                // Ahora verificamos si hay error explícito en la respuesta
-                if (data.results && data.results.length > 0) {
-                    const resultItem = data.results[0];
-                    
-                    if (resultItem.error) {
-                        // SI EL BACKEND DEVUELVE ERROR, LO MOSTRAMOS
-                        throw new Error(`Backend Error: ${resultItem.error}`);
-                    }
-                    
-                    if (resultItem.data) {
-                        jsonArea.value = JSON.stringify(resultItem.data, null, 4);
-                        setStatus("✅ Éxito. Revisa el JSON.", "green");
-                        btnDraft.disabled = false;
-                    } else {
-                        throw new Error("Respuesta vacía (sin datos ni error).");
-                    }
-                } else {
-                    throw new Error("Formato de respuesta desconocido.");
-                }
-
-            } catch (e) {
-                console.error(e);
-                setStatus(`❌ FALLÓ: ${e.message}`, "red");
-                jsonArea.value = `DETALLE DEL ERROR:\n${e.message}`;
+        // --- FUNCIONES DE SUBIDA ---
+        function mostrarNombre() {
+            const file = document.getElementById('fileInput').files[0];
+            if (file) {
+                document.getElementById('fileName').innerText = "Archivo seleccionado: " + file.name;
             }
         }
 
-        async function generateDraft() {
+        async function procesarActa() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) return alert("⚠️ Por favor selecciona un archivo PDF primero.");
+
+            // Mostrar carga, ocultar resultados previos
+            document.getElementById('loadingUpload').style.display = 'block';
+            document.getElementById('resultadoUpload').style.display = 'none';
+
+            const formData = new FormData();
+            formData.append("file", file);
+
             try {
-                const jsonData = JSON.parse(jsonArea.value);
-                setStatus("⏳ Redactando...", "#0078d4");
-                const res = await fetch(`${API}/draft-minutes`, {
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ extracted_data: jsonData })
+                // NOTA: Endpoint actualizado a /procesar-acta
+                const response = await fetch(`${API_URL}/procesar-acta`, {
+                    method: 'POST',
+                    body: formData
                 });
-                const data = await res.json();
-                if (data.draft_text) {
-                    textArea.value = data.draft_text;
-                    setStatus("✅ Borrador listo.", "green");
-                    btnDownload.disabled = false;
-                } else { throw new Error(data.detail || "Error redactando"); }
-            } catch (e) { setStatus(`❌ Error: ${e.message}`, "red"); }
+
+                if (!response.ok) {
+                    throw new Error(`Error del servidor: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Construir HTML de respuesta
+                let html = `<p><span class="data-label">✅ Estado:</span> ${data.mensaje}</p>`;
+                html += `<p><span class="data-label">📅 Fecha Detectada:</span> ${data.datos.fecha_iso || "Hoy (No encontrada en texto)"}</p>`;
+                html += `<p><span class="data-label">📝 Resumen:</span> ${data.datos.resumen}</p>`;
+                html += `<p><a href="${data.url_archivo}" target="_blank" style="color:#3498db; font-weight:bold;">📥 Descargar PDF Almacenado</a></p>`;
+                
+                document.getElementById('resultadoUpload').innerHTML = html;
+                document.getElementById('resultadoUpload').style.display = 'block';
+
+            } catch (error) {
+                console.error(error);
+                alert("❌ Error al procesar: " + error.message);
+            } finally {
+                document.getElementById('loadingUpload').style.display = 'none';
+            }
         }
 
-        async function downloadFinalDocx() {
-            const finalContent = textArea.value;
-            setStatus("⏳ Descargando...", "#0078d4");
+        // --- FUNCIONES DEL CHAT ---
+        function handleEnter(e) {
+            if (e.key === 'Enter') preguntarChat();
+        }
+
+        async function preguntarChat() {
+            const pregunta = document.getElementById('preguntaInput').value.trim();
+            if (!pregunta) return alert("⚠️ Escribe una pregunta primero.");
+
+            document.getElementById('loadingChat').style.display = 'block';
+            document.getElementById('chatResponse').style.display = 'none';
+
             try {
-                const res = await fetch(`${API}/create-docx`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ markdown_text: finalContent })
-                });
-                if (res.ok) {
-                    const blob = await res.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = "Acta_Final.docx";
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    setStatus("🎉 Listo.", "green");
-                } else { throw new Error("Error al crear archivo"); }
-            } catch (e) { setStatus(`❌ Error descarga: ${e.message}`, "red"); }
+                // NOTA: Endpoint actualizado a /chat
+                const response = await fetch(`${API_URL}/chat?pregunta=${encodeURIComponent(pregunta)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Error del servidor: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // Mostrar texto
+                document.getElementById('chatText').innerText = data.respuesta;
+                
+                // Mostrar fuentes
+                const sourcesDiv = document.getElementById('sourcesList');
+                sourcesDiv.innerHTML = ""; // Limpiar anteriores
+                
+                if (data.fuentes && data.fuentes.length > 0) {
+                    data.fuentes.forEach(fuente => {
+                        // Crear enlace si es posible, o solo texto
+                        const div = document.createElement('div');
+                        div.innerHTML = `📄 ${fuente}`;
+                        div.style.marginTop = "5px";
+                        sourcesDiv.appendChild(div);
+                    });
+                    document.getElementById('chatSources').style.display = 'block';
+                } else {
+                    document.getElementById('chatSources').style.display = 'none';
+                }
+
+                document.getElementById('chatResponse').style.display = 'block';
+
+            } catch (error) {
+                console.error(error);
+                alert("❌ Error en el chat: " + error.message);
+            } finally {
+                document.getElementById('loadingChat').style.display = 'none';
+            }
         }
     </script>
 </body>
