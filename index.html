@@ -3,203 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestor de Actas con IA (RAG)</title>
+    <title>Chat de Actas Inteligente</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f4f7f6; color: #333; }
-        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; }
-        h1, h2 { text-align: center; color: #2c3e50; margin-bottom: 20px; }
-        h1 { border-bottom: 2px solid #3498db; padding-bottom: 15px; display: inline-block; width: 100%; }
+        body { font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f4f7f6; }
+        .container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        h1, h2 { color: #2c3e50; text-align: center; }
         
-        /* Estilos de Subida */
-        .upload-section { text-align: center; border: 2px dashed #bdc3c7; border-radius: 10px; padding: 40px; transition: 0.3s; background: #fafafa; }
-        .upload-section:hover { border-color: #3498db; background: #f0f8ff; }
-        .btn-primary { background-color: #3498db; color: white; border: none; padding: 12px 25px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 15px; transition: 0.2s; }
-        .btn-primary:hover { background-color: #2980b9; transform: translateY(-1px); }
-        .btn-primary:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        /* Chat Area */
+        #chat-window { height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 20px; margin-bottom: 15px; border-radius: 8px; background: #fff; display: flex; flex-direction: column; gap: 15px; }
+        .msg { padding: 10px 15px; border-radius: 10px; max-width: 80%; line-height: 1.5; }
+        .msg.user { background-color: #3498db; color: white; align-self: flex-end; }
+        .msg.assistant { background-color: #ecf0f1; color: #2c3e50; align-self: flex-start; border-left: 4px solid #2ecc71; }
         
-        #fileName { color: #7f8c8d; margin-top: 10px; font-style: italic; }
-        
-        /* Resultados de Subida */
-        #resultadoUpload { margin-top: 20px; padding: 20px; border-radius: 8px; background-color: #f8f9fa; border-left: 5px solid #2ecc71; display: none; }
-        .data-label { font-weight: bold; color: #2c3e50; }
-        
-        /* Estilos del Chat */
-        .chat-container { display: flex; flex-direction: column; gap: 15px; }
-        .input-group { display: flex; gap: 10px; }
-        input[type="text"] { flex-grow: 1; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; outline: none; transition: 0.3s; }
-        input[type="text"]:focus { border-color: #3498db; box-shadow: 0 0 5px rgba(52,152,219,0.3); }
-        
-        .chat-response-box { background-color: #eefbfb; padding: 20px; border-radius: 8px; border-left: 5px solid #00b894; display: none; animation: fadeIn 0.5s; }
-        .source-box { margin-top: 15px; padding-top: 10px; border-top: 1px solid #d1d8e0; font-size: 0.9em; }
-        .source-link { color: #0984e3; text-decoration: none; display: block; margin-bottom: 5px; }
-        .source-link:hover { text-decoration: underline; }
+        .sources { font-size: 0.85em; margin-top: 5px; padding-top: 5px; border-top: 1px solid #ccc; color: #555; }
+        .download-link { color: #e67e22; text-decoration: none; font-weight: bold; margin-right: 10px; }
+        .download-link:hover { text-decoration: underline; }
 
-        /* Animación de Carga */
-        .loading { display: none; text-align: center; color: #7f8c8d; margin: 15px 0; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px auto; }
-        
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .input-area { display: flex; gap: 10px; }
+        input { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 6px; }
+        button { padding: 12px 25px; background: #2c3e50; color: white; border: none; border-radius: 6px; cursor: pointer; }
+        button:hover { background: #34495e; }
+        .loading { color: #7f8c8d; font-style: italic; font-size: 0.9em; text-align: center; display: none; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>📂 Centro de Carga de Actas</h1>
-        <p style="text-align: center; color: #666;">Sube tus actas en PDF para que la IA las lea, extraiga la fecha real y las guarde en la base de conocimientos.</p>
+        <h1>Gestor de Actas v5</h1>
         
-        <div class="upload-section" onclick="document.getElementById('fileInput').click()">
-            <p style="font-size: 1.2em; color: #2c3e50;">Haz clic aquí para seleccionar tu PDF</p>
-            <span style="font-size: 3em;">📄</span>
-            <input type="file" id="fileInput" accept=".pdf" style="display: none" onchange="mostrarNombre()">
+        <div style="border: 2px dashed #bdc3c7; padding: 20px; text-align: center; border-radius: 8px;">
+            <input type="file" id="fileInput" accept=".pdf">
+            <button onclick="subir()" style="background: #27ae60;">Subir y Procesar</button>
+            <p id="statusUpload" style="margin-top: 10px; font-weight: bold;"></p>
         </div>
-        
-        <div style="text-align: center;">
-            <p id="fileName"></p>
-            <button class="btn-primary" onclick="procesarActa()">🚀 Procesar e Indexar Acta</button>
-        </div>
-
-        <div id="loadingUpload" class="loading">
-            <div class="spinner"></div>
-            <p>Analizando documento, extrayendo fechas y guardando en Azure AI Search...</p>
-        </div>
-
-        <div id="resultadoUpload"></div>
     </div>
 
     <div class="container">
-        <h2>🤖 Chat con tus Documentos</h2>
-        <p style="text-align: center; color: #666;">Pregunta sobre acuerdos, fechas o asistentes. La IA buscará la respuesta exacta en tus archivos.</p>
-        
-        <div class="chat-container">
-            <div class="input-group">
-                <input type="text" id="preguntaInput" placeholder="Ej: ¿Cuáles fueron los acuerdos de la reunión del 15 de octubre?" onkeypress="handleEnter(event)">
-                <button class="btn-primary" onclick="preguntarChat()">🔍 Buscar</button>
-            </div>
+        <h2>💬 Chat con Memoria</h2>
+        <div id="chat-window">
+            <div class="msg assistant">Hola, soy tu experto en actas. ¿Qué necesitas saber hoy?</div>
         </div>
-
-        <div id="loadingChat" class="loading">
-            <div class="spinner"></div>
-            <p>Consultando la base de conocimientos...</p>
-        </div>
-
-        <div id="chatResponse" class="chat-response-box">
-            <h3 style="margin-top: 0; color: #2d3436;">Respuesta:</h3>
-            <p id="chatText" style="line-height: 1.6; white-space: pre-wrap;"></p>
-            
-            <div id="chatSources" class="source-box">
-                <strong>📚 Fuentes consultadas:</strong>
-                <div id="sourcesList"></div>
-            </div>
+        <p id="loadingChat" class="loading">Pensando y buscando archivos...</p>
+        <div class="input-area">
+            <input type="text" id="pregunta" placeholder="Escribe tu pregunta..." onkeypress="if(event.key==='Enter') preguntar()">
+            <button onclick="preguntar()">Enviar</button>
         </div>
     </div>
 
     <script>
-        // --- CONFIGURACIÓN ---
-        // Pega aquí la URL exacta que aparece en tus logs de Container Apps
-        // Asegúrate de que NO tenga una barra "/" al final
+        // URL DE TU BACKEND (Asegúrate de que sea la correcta)
         const API_URL = "https://api-experto-en-actas.salmonflower-73fd32d3.eastus.azurecontainerapps.io"; 
+        
+        // Memoria del Chat (Frontend State)
+        let chatHistory = []; 
 
-        // --- FUNCIONES DE SUBIDA ---
-        function mostrarNombre() {
+        async function subir() {
             const file = document.getElementById('fileInput').files[0];
-            if (file) {
-                document.getElementById('fileName').innerText = "Archivo seleccionado: " + file.name;
-            }
-        }
-
-        async function procesarActa() {
-            const fileInput = document.getElementById('fileInput');
-            const file = fileInput.files[0];
+            if(!file) return alert("Selecciona archivo");
             
-            if (!file) return alert("⚠️ Por favor selecciona un archivo PDF primero.");
-
-            // Mostrar carga, ocultar resultados previos
-            document.getElementById('loadingUpload').style.display = 'block';
-            document.getElementById('resultadoUpload').style.display = 'none';
-
+            document.getElementById('statusUpload').innerText = "Subiendo y analizando...";
             const formData = new FormData();
             formData.append("file", file);
+            
+            try {
+                const res = await fetch(`${API_URL}/procesar-acta`, { method: 'POST', body: formData });
+                const data = await res.json();
+                document.getElementById('statusUpload').innerHTML = 
+                    `✅ Listo! <a href="${data.url_sas}" target="_blank">Descargar PDF</a> (Resumen: ${data.datos.resumen.substring(0,50)}...)`;
+            } catch(e) { alert("Error: " + e); }
+        }
+
+        async function preguntar() {
+            const input = document.getElementById('pregunta');
+            const texto = input.value.trim();
+            if(!texto) return;
+
+            // 1. Mostrar mensaje usuario
+            addMessage("user", texto);
+            input.value = "";
+            document.getElementById('loadingChat').style.display = 'block';
 
             try {
-                // NOTA: Endpoint actualizado a /procesar-acta
-                const response = await fetch(`${API_URL}/procesar-acta`, {
+                // 2. Enviar a API con Historial
+                const payload = {
+                    question: texto,
+                    history: chatHistory
+                };
+
+                const res = await fetch(`${API_URL}/chat`, {
                     method: 'POST',
-                    body: formData
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                 });
+                
+                const data = await res.json();
 
-                if (!response.ok) {
-                    throw new Error(`Error del servidor: ${response.status}`);
+                // 3. Mostrar respuesta IA
+                let contentHTML = data.respuesta.replace(/\n/g, "<br>");
+                
+                // Agregar fuentes con links SAS
+                if(data.fuentes && data.fuentes.length > 0){
+                    contentHTML += `<div class='sources'><strong>Fuentes:</strong><br>`;
+                    data.fuentes.forEach(f => {
+                        contentHTML += `<a href="${f.link}" class="download-link" target="_blank">📥 ${f.nombre}</a> `;
+                    });
+                    contentHTML += `</div>`;
                 }
-                
-                const data = await response.json();
-                
-                // Construir HTML de respuesta
-                let html = `<p><span class="data-label">✅ Estado:</span> ${data.mensaje}</p>`;
-                html += `<p><span class="data-label">📅 Fecha Detectada:</span> ${data.datos.fecha_iso || "Hoy (No encontrada en texto)"}</p>`;
-                html += `<p><span class="data-label">📝 Resumen:</span> ${data.datos.resumen}</p>`;
-                html += `<p><a href="${data.url_archivo}" target="_blank" style="color:#3498db; font-weight:bold;">📥 Descargar PDF Almacenado</a></p>`;
-                
-                document.getElementById('resultadoUpload').innerHTML = html;
-                document.getElementById('resultadoUpload').style.display = 'block';
 
-            } catch (error) {
-                console.error(error);
-                alert("❌ Error al procesar: " + error.message);
+                addMessage("assistant", contentHTML, true); // true = es HTML
+
+            } catch(e) {
+                addMessage("assistant", "Error de conexión: " + e);
             } finally {
-                document.getElementById('loadingUpload').style.display = 'none';
+                document.getElementById('loadingChat').style.display = 'none';
             }
         }
 
-        // --- FUNCIONES DEL CHAT ---
-        function handleEnter(e) {
-            if (e.key === 'Enter') preguntarChat();
-        }
+        function addMessage(role, text, isHTML = false) {
+            const div = document.createElement('div');
+            div.className = `msg ${role}`;
+            if(isHTML) div.innerHTML = text;
+            else div.innerText = text;
+            
+            document.getElementById('chat-window').appendChild(div);
+            document.getElementById('chat-window').scrollTop = document.getElementById('chat-window').scrollHeight;
 
-        async function preguntarChat() {
-            const pregunta = document.getElementById('preguntaInput').value.trim();
-            if (!pregunta) return alert("⚠️ Escribe una pregunta primero.");
-
-            document.getElementById('loadingChat').style.display = 'block';
-            document.getElementById('chatResponse').style.display = 'none';
-
-            try {
-                // NOTA: Endpoint actualizado a /chat
-                const response = await fetch(`${API_URL}/chat?pregunta=${encodeURIComponent(pregunta)}`);
-                
-                if (!response.ok) {
-                    throw new Error(`Error del servidor: ${response.status}`);
-                }
-
-                const data = await response.json();
-
-                // Mostrar texto
-                document.getElementById('chatText').innerText = data.respuesta;
-                
-                // Mostrar fuentes
-                const sourcesDiv = document.getElementById('sourcesList');
-                sourcesDiv.innerHTML = ""; // Limpiar anteriores
-                
-                if (data.fuentes && data.fuentes.length > 0) {
-                    data.fuentes.forEach(fuente => {
-                        // Crear enlace si es posible, o solo texto
-                        const div = document.createElement('div');
-                        div.innerHTML = `📄 ${fuente}`;
-                        div.style.marginTop = "5px";
-                        sourcesDiv.appendChild(div);
-                    });
-                    document.getElementById('chatSources').style.display = 'block';
-                } else {
-                    document.getElementById('chatSources').style.display = 'none';
-                }
-
-                document.getElementById('chatResponse').style.display = 'block';
-
-            } catch (error) {
-                console.error(error);
-                alert("❌ Error en el chat: " + error.message);
-            } finally {
-                document.getElementById('loadingChat').style.display = 'none';
+            // Guardar en memoria (solo texto plano para enviar al backend)
+            // Si es HTML (respuesta con links), limpiamos un poco o guardamos solo el texto base si es posible, 
+            // pero para simplificar, guardamos el raw text si no es html complejo.
+            if (role === 'user' || !isHTML) {
+                chatHistory.push({ role: role, content: text });
+            } else {
+                 // Si es HTML (del bot), intentamos guardar una versión limpia o el mismo HTML si OpenAI lo entiende bien
+                 // Una opción simple es no guardar el HTML de las fuentes en el historial de contexto
+                 let cleanText = text.split("<div class='sources'>")[0].replace(/<br>/g, "\n");
+                 chatHistory.push({ role: role, content: cleanText });
             }
         }
     </script>
