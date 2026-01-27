@@ -3,92 +3,190 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat de Acuerdos Inteligente</title>
+    <title>Gestor de Actas Inteligente v2.0</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; background-color: #f4f7f6; }
         .container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; }
         h1, h2 { color: #2c3e50; text-align: center; }
         
         /* Chat Area */
-        #chat-window { height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 20px; margin-bottom: 15px; border-radius: 8px; background: #fff; display: flex; flex-direction: column; gap: 15px; }
-        .msg { padding: 10px 15px; border-radius: 10px; max-width: 80%; line-height: 1.5; }
-        .msg.user { background-color: #3498db; color: white; align-self: flex-end; }
-        .msg.assistant { background-color: #ecf0f1; color: #2c3e50; align-self: flex-start; border-left: 4px solid #2ecc71; }
+        #chat-window { height: 450px; overflow-y: auto; border: 1px solid #ddd; padding: 20px; margin-bottom: 15px; border-radius: 8px; background: #fff; display: flex; flex-direction: column; gap: 15px; }
+        .msg { padding: 12px 18px; border-radius: 10px; max-width: 85%; line-height: 1.6; font-size: 0.95em; }
+        .msg.user { background-color: #3498db; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .msg.assistant { background-color: #ecf0f1; color: #2c3e50; align-self: flex-start; border-left: 4px solid #2ecc71; border-bottom-left-radius: 2px; }
         
-        .sources { font-size: 0.85em; margin-top: 5px; padding-top: 5px; border-top: 1px solid #ccc; color: #555; }
-        .download-link { color: #e67e22; text-decoration: none; font-weight: bold; margin-right: 10px; }
+        /* Fuentes y Botones */
+        .sources { font-size: 0.85em; margin-top: 10px; padding-top: 10px; border-top: 1px solid #dcdcdc; color: #555; display: flex; flex-direction: column; gap: 5px; }
+        .source-item { display: flex; align-items: center; justify-content: space-between; background: #f9f9f9; padding: 5px 10px; border-radius: 5px; }
+        .download-link { color: #e67e22; text-decoration: none; font-weight: bold; }
         .download-link:hover { text-decoration: underline; }
+        
+        /* Botón Mágico Crear Acta */
+        .btn-crear-acta {
+            background-color: #27ae60; color: white; border: none; padding: 4px 10px; 
+            border-radius: 4px; cursor: pointer; font-size: 0.8em; margin-left: 10px;
+            transition: transform 0.2s;
+        }
+        .btn-crear-acta:hover { transform: scale(1.05); background-color: #219150; }
 
+        /* Input Area */
         .input-area { display: flex; gap: 10px; }
-        input { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 6px; }
-        button { padding: 12px 25px; background: #2c3e50; color: white; border: none; border-radius: 6px; cursor: pointer; }
-        button:hover { background: #34495e; }
-        .loading { color: #7f8c8d; font-style: italic; font-size: 0.9em; text-align: center; display: none; }
+        input[type="text"] { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 6px; outline: none; }
+        input[type="text"]:focus { border-color: #3498db; }
+        button.send-btn { padding: 12px 25px; background: #2c3e50; color: white; border: none; border-radius: 6px; cursor: pointer; }
+        button.send-btn:hover { background: #34495e; }
+        .loading { color: #7f8c8d; font-style: italic; font-size: 0.9em; text-align: center; display: none; margin-top: 5px; }
+
+        /* --- MODAL EDITOR DE ACTA --- */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); backdrop-filter: blur(2px); }
+        .modal-content { background-color: #fefefe; margin: 2% auto; padding: 0; border: 1px solid #888; width: 21cm; min-height: 29.7cm; border-radius: 8px; box-shadow: 0 4px 25px rgba(0,0,0,0.2); display: flex; flex-direction: column; }
+        
+        .modal-header { padding: 15px 20px; background: #2c3e50; color: white; display: flex; justify-content: space-between; align-items: center; border-top-left-radius: 8px; border-top-right-radius: 8px; }
+        
+        .modal-body { 
+            padding: 30px; 
+            padding-top: 10px; /* Mucho menos espacio arriba */
+            overflow-y: auto; 
+            background: white; 
+            color: black; 
+            line-height: 1.5; 
+            flex-grow: 1; 
+            outline: none; 
+        }
+        
+        
+        #editorContent > h1:first-child {
+            margin-top: 0;
+            padding-top: 10px;
+        }
+
+        /* Estilo Hoja de Papel para el Editor */
+        .paper-look {
+            background: white;
+            font-family: 'Times New Roman', serif;
+            font-size: 12pt;
+        }
+
+        .modal-actions { padding: 10px; background: #ecf0f1; text-align: right; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+        .btn-modal { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-left: 10px; }
+        .btn-save { background: #e74c3c; color: white; } /* Rojo PDF */
+        .btn-close { background: #95a5a6; color: white; }
+
+        /* Estilos básicos para el acta generada (Tablas, etc) */
+        .modal-body table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 10px; }
+        .modal-body th, .modal-body td { border: 1px solid black; padding: 8px; text-align: left; }
+        .modal-body h1 { font-size: 18pt; text-align: center; color: black; }
+        .modal-body h2 { font-size: 14pt; border-bottom: 1px solid black; padding-bottom: 5px; margin-top: 20px; color: black; text-align: left; }
+
+        /* Reglas anti-corte para impresión/PDF */
+        p, h1, h2, h3, h4, li {
+            page-break-inside: avoid; /* Para navegadores viejos */
+            break-inside: avoid;      /* Estándar moderno */
+        }
+
+        /* Especial para tablas: evita que una fila se parta a la mitad */
+        tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        
+        /* Asegura que las tablas no se corten raro */
+        table {
+            page-break-inside: auto;
+        }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>Experto en Acuerdos de Relacionamiento</h1>
+        <h1>📑 Gestor Inteligente de Actas & Transcripciones</h1>
         
-        <div style="border: 2px dashed #bdc3c7; padding: 20px; text-align: center; border-radius: 8px;">
+        <div style="border: 2px dashed #bdc3c7; padding: 20px; text-align: center; border-radius: 8px; background: #fafafa;">
+            <p style="margin-bottom: 10px; color: #666;">Sube Actas (PDF) o Transcripciones (DOCX/VTT)</p>
             <input type="file" id="fileInput" accept=".pdf,.docx,.vtt,.doc">
-            <button onclick="subir()" style="background: #27ae60;">Subir y Procesar</button>
-            <p id="statusUpload" style="margin-top: 10px; font-weight: bold;"></p>
+            <button onclick="subir()" style="background: #2980b9; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">Subir Documento</button>
+            <p id="statusUpload" style="margin-top: 10px; font-weight: bold; min-height: 20px;"></p>
         </div>
     </div>
 
     <div class="container">
-        <h2>💬 Chat con Memoria</h2>
+        <h2>💬 Chat con el Experto</h2>
         <div id="chat-window">
-            <div class="msg assistant">Hola, soy tu experto en actas. ¿Qué necesitas saber hoy?</div>
+            <div class="msg assistant">Hola. Puedo analizar actas históricas y generar nuevas actas a partir de transcripciones. ¿En qué te ayudo?</div>
         </div>
-        <p id="loadingChat" class="loading">Pensando y buscando archivos...</p>
+        
+        <p id="loadingChat" class="loading">🧠 Analizando documentos y cruzando información...</p>
+        
         <div class="input-area">
-            <input type="text" id="pregunta" placeholder="Escribe tu pregunta..." onkeypress="if(event.key==='Enter') preguntar()">
-            <button onclick="preguntar()">Enviar</button>
+            <input type="text" id="pregunta" placeholder="Ej: ¿Qué se acordó sobre el presupuesto?" onkeypress="if(event.key==='Enter') preguntar()">
+            <button class="send-btn" onclick="preguntar()">Enviar Pregunta</button>
+        </div>
+    </div>
+
+    <div id="actaModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span style="font-size: 1.2em; font-weight: bold;">📝 Editor de Borrador de Acta</span>
+                <span style="font-size: 0.9em; opacity: 0.8;">Puedes editar el texto directamente aquí</span>
+            </div>
+            
+            <div id="editorContent" class="modal-body paper-look" contenteditable="true">
+                </div>
+
+            <div class="modal-actions">
+                <button class="btn-modal btn-close" onclick="cerrarModal()">Cerrar</button>
+                <button class="btn-modal btn-save" onclick="exportarPDF()">💾 Guardar como PDF</button>
+            </div>
         </div>
     </div>
 
     <script>
-        // URL DE TU BACKEND (Asegúrate de que sea la correcta)
+        // --- CONFIGURACIÓN ---
+        // Asegúrate de que coincida con tu URL de Azure Container Apps
         const API_URL = "https://api-experto-en-actas.salmonflower-73fd32d3.eastus.azurecontainerapps.io"; 
         
-        // Memoria del Chat (Frontend State)
         let chatHistory = []; 
 
+        // --- SUBIDA DE ARCHIVOS ---
         async function subir() {
             const file = document.getElementById('fileInput').files[0];
-            if(!file) return alert("Selecciona archivo");
+            if(!file) return alert("Por favor selecciona un archivo primero.");
             
-            document.getElementById('statusUpload').innerText = "Subiendo y analizando...";
+            const statusDiv = document.getElementById('statusUpload');
+            statusDiv.innerText = "⏳ Procesando documento (esto puede tardar unos segundos)...";
+            statusDiv.style.color = "blue";
+
             const formData = new FormData();
             formData.append("file", file);
             
             try {
-                const res = await fetch(`${API_URL}/procesar-documento`, { method: 'POST', body: formData });
+                // NOTA: Usamos /procesar-acta porque así está definido en el backend v16
+                const res = await fetch(`${API_URL}/procesar-acta`, { method: 'POST', body: formData });
+                
+                if (!res.ok) throw new Error("Error en el servidor");
+                
                 const data = await res.json();
-                document.getElementById('statusUpload').innerHTML = 
-                    `✅ Listo! <a href="${data.url_sas}" target="_blank">Descargar PDF</a> (Resumen: ${data.datos.resumen.substring(0,50)}...)`;
-            } catch(e) { alert("Error: " + e); }
+                statusDiv.innerHTML = `✅ <b>${data.mensaje}</b> <a href="${data.url_sas}" target="_blank">Ver Archivo</a>`;
+                statusDiv.style.color = "green";
+            } catch(e) { 
+                statusDiv.innerText = "❌ Error: " + e.message;
+                statusDiv.style.color = "red";
+            }
         }
 
+        // --- CHAT ---
         async function preguntar() {
             const input = document.getElementById('pregunta');
             const texto = input.value.trim();
             if(!texto) return;
 
-            // 1. Mostrar mensaje usuario
             addMessage("user", texto);
             input.value = "";
             document.getElementById('loadingChat').style.display = 'block';
 
             try {
-                // 2. Enviar a API con Historial
-                const payload = {
-                    question: texto,
-                    history: chatHistory
-                };
+                const payload = { question: texto, history: chatHistory };
 
                 const res = await fetch(`${API_URL}/chat`, {
                     method: 'POST',
@@ -98,24 +196,102 @@
                 
                 const data = await res.json();
 
-                // 3. Mostrar respuesta IA
+                // Formatear respuesta
                 let contentHTML = data.respuesta.replace(/\n/g, "<br>");
                 
-                // Agregar fuentes con links SAS
+                // Procesar Fuentes y Detectar Transcripciones
                 if(data.fuentes && data.fuentes.length > 0){
-                    contentHTML += `<div class='sources'><strong>Fuentes:</strong><br>`;
+                    contentHTML += `<div class='sources'><strong>📚 Fuentes Consultadas:</strong>`;
+                    
                     data.fuentes.forEach(f => {
-                        contentHTML += `<a href="${f.link}" class="download-link" target="_blank">📥 ${f.nombre}</a> `;
+                        let btnActa = "";
+                        // Lógica clave: Si es transcripción, mostrar botón de crear acta
+                        if (f.tipo && (f.tipo.includes('transcripcion') || f.tipo.includes('docx') || f.tipo.includes('vtt'))) {
+                            btnActa = `<button class="btn-crear-acta" onclick="generarBorrador('${f.blob_name}')">📝 Crear Acta</button>`;
+                        }
+
+                        contentHTML += `
+                            <div class="source-item">
+                                <span>📄 <a href="${f.link}" class="download-link" target="_blank">${f.nombre}</a></span>
+                                ${btnActa}
+                            </div>`;
                     });
                     contentHTML += `</div>`;
                 }
 
-                addMessage("assistant", contentHTML, true); // true = es HTML
+                addMessage("assistant", contentHTML, true);
 
             } catch(e) {
-                addMessage("assistant", "Error de conexión: " + e);
+                addMessage("assistant", "⚠️ Error de conexión: " + e);
             } finally {
                 document.getElementById('loadingChat').style.display = 'none';
+            }
+        }
+
+        // --- GENERADOR DE ACTAS (NUEVO) ---
+        async function generarBorrador(blobName) {
+            // Mostrar loading global o alerta
+            const statusDiv = document.getElementById('loadingChat');
+            statusDiv.innerText = "⚙️ Generando borrador de acta formal... (Esto toma unos 10-20 segundos)";
+            statusDiv.style.display = 'block';
+
+            try {
+                const res = await fetch(`${API_URL}/generar-borrador-acta`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ blob_name: blobName })
+                });
+
+                if (!res.ok) throw new Error("Fallo en la generación");
+
+                const data = await res.json();
+                
+                // Inyectar HTML en el editor
+                document.getElementById('editorContent').innerHTML = data.html_acta;
+                
+                // Abrir Modal
+                document.getElementById('actaModal').style.display = "block";
+
+            } catch(e) {
+                alert("Error generando el acta: " + e.message);
+            } finally {
+                statusDiv.innerText = "🧠 Analizando documentos..."; // Reset texto loading
+                statusDiv.style.display = 'none';
+            }
+        }
+
+        // --- EXPORTAR A PDF ---
+        function exportarPDF() {
+            const element = document.getElementById('editorContent');
+            
+            const opt = {
+                // Márgenes: [Arriba, Derecha, Abajo, Izquierda]
+                margin:       [0.5, 0.8, 0.8, 0.8], 
+                filename:     'Borrador_Acta.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, scrollY: 0 }, 
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
+                
+                // --- LA SOLUCIÓN MÁGICA ---
+                // 'avoid-all': Intenta no cortar NINGÚN elemento por la mitad.
+                // 'css': Respeta las reglas CSS que pusimos arriba.
+                // 'legacy': Usa algoritmos antiguos como respaldo.
+                pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+            };
+            
+            html2pdf().set(opt).from(element).save();
+        }
+
+        // --- UTILIDADES ---
+        function cerrarModal() {
+            document.getElementById('actaModal').style.display = "none";
+        }
+
+        // Cerrar modal si clic fuera
+        window.onclick = function(event) {
+            const modal = document.getElementById('actaModal');
+            if (event.target == modal) {
+                modal.style.display = "none";
             }
         }
 
@@ -125,18 +301,15 @@
             if(isHTML) div.innerHTML = text;
             else div.innerText = text;
             
-            document.getElementById('chat-window').appendChild(div);
-            document.getElementById('chat-window').scrollTop = document.getElementById('chat-window').scrollHeight;
+            const chatWindow = document.getElementById('chat-window');
+            chatWindow.appendChild(div);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
 
-            // Guardar en memoria (solo texto plano para enviar al backend)
-            // Si es HTML (respuesta con links), limpiamos un poco o guardamos solo el texto base si es posible, 
-            // pero para simplificar, guardamos el raw text si no es html complejo.
             if (role === 'user' || !isHTML) {
                 chatHistory.push({ role: role, content: text });
             } else {
-                 // Si es HTML (del bot), intentamos guardar una versión limpia o el mismo HTML si OpenAI lo entiende bien
-                 // Una opción simple es no guardar el HTML de las fuentes en el historial de contexto
-                 let cleanText = text.split("<div class='sources'>")[0].replace(/<br>/g, "\n");
+                 // Limpiamos el HTML para no ensuciar el contexto de OpenAI
+                 let cleanText = text.split("<div class='sources'>")[0].replace(/<br>/g, "\n").replace(/<[^>]*>?/gm, '');
                  chatHistory.push({ role: role, content: cleanText });
             }
         }
