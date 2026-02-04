@@ -10,5 +10,8 @@
       "redirect": "/.auth/login/aad?post_login_redirect_uri=/",
       "statusCode": 302
     }
+  },
+  "navigationFallback": {
+    "rewrite": "/index.html"
   }
 }

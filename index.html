@@ -352,99 +352,98 @@
     </div>
 
     <script>
-        // --- CONFIGURACIÓN ---
-        // URL de tu Backend (donde está el motor de IA y el OCR)
-        const API_URL = "https://api-experto-en-actas.salmonflower-73fd32d3.eastus.azurecontainerapps.io";
-        let chatHistory = [];
+    // --- CONFIGURACIÓN OPTIMIZADA ---
+    // Al estar vinculado en el Portal de Azure, usamos la ruta relativa
+    const API_URL = "/api"; 
+    let chatHistory = [];
 
-        window.onload = function () {
-            console.log("Sistema SierraCol listo. Autenticación vinculada al Backend.");
-        };
+    window.onload = function () {
+        console.log("Sistema SierraCol listo. Backend vinculado y seguro.");
+    };
 
-        function redirigirALogin() {
-            // No uses el API_URL aquí. Usa la ruta relativa de la SWA.
-            const loginUrl = `/.auth/login/aad?post_login_redirect_uri=/`;
-            window.location.href = loginUrl;
+    function redirigirALogin() {
+        // Usamos la ruta nativa de la SWA para el login
+        // Esto evita que el botón 'Return to website' falle
+        window.location.href = "/.auth/login/aad?post_login_redirect_uri=/";
+    }
+
+    // --- SUBIDA DE ARCHIVOS ---
+    async function subir() {
+        const file = document.getElementById('fileInput').files[0];
+        if (!file) return alert("Selecciona un archivo primero.");
+
+        const statusDiv = document.getElementById('statusUpload');
+        statusDiv.innerText = "⏳ Procesando en Azure Intelligence...";
+        statusDiv.style.color = "blue";
+
+        const formData = new FormData();
+        formData.append("file_transcripcion", file);
+        formData.append("file_presentacion", file);
+
+        try {
+            // El fetch ahora es mucho más simple y seguro
+            const res = await fetch(`${API_URL}/automatizacion/generar-acta-comite-dual`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (res.status === 401) return redirigirALogin();
+            if (!res.ok) throw new Error("Fallo en la extracción de datos.");
+
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Acta_SierraCol_${new Date().getTime()}.docx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+
+            statusDiv.innerText = "✅ Acta generada exitosamente.";
+            statusDiv.style.color = "green";
+        } catch (e) {
+            statusDiv.innerText = "❌ Error: Sesión expirada o problema en el servidor.";
+            statusDiv.style.color = "red";
         }
+    }
 
-        // --- SUBIDA DE ARCHIVOS (OCR v29+) ---
-        async function subir() {
-            const file = document.getElementById('fileInput').files[0];
-            if (!file) return alert("Selecciona un archivo primero.");
+    // --- CHAT ESTRATÉGICO ---
+    async function preguntar() {
+        const input = document.getElementById('pregunta');
+        const texto = input.value.trim();
+        if (!texto) return;
 
-            const statusDiv = document.getElementById('statusUpload');
-            statusDiv.innerText = "⏳ Procesando en Azure Intelligence (Fidelidad 98%)...";
-            statusDiv.style.color = "blue";
+        addMessage("user", texto);
+        input.value = "";
+        document.getElementById('loadingChat').style.display = 'block';
 
-            const formData = new FormData();
-            formData.append("file_transcripcion", file);
-            formData.append("file_presentacion", file);
+        try {
+            const res = await fetch(`${API_URL}/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question: texto })
+            });
 
-            try {
-                const res = await fetch(`${API_URL}/automatizacion/generar-acta-comite-dual`, {
-                    method: 'POST',
-                    body: formData,
-                    credentials: 'include' // Crucial para enviar la cookie de /aad
-                });
+            if (res.status === 401) return redirigirALogin();
 
-                if (res.status === 401) return redirigirALogin();
-                if (!res.ok) throw new Error("Fallo en la extracción de datos.");
-
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Acta_SierraCol_${new Date().getTime()}.docx`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-
-                statusDiv.innerText = "✅ Acta generada con datos técnicos exitosamente.";
-                statusDiv.style.color = "green";
-            } catch (e) {
-                statusDiv.innerText = "❌ Error: Sesión expirada o archivo muy pesado.";
-                statusDiv.style.color = "red";
-            }
+            const data = await res.json();
+            addMessage("assistant", data.respuesta.replace(/\n/g, "<br>"), true);
+        } catch (e) {
+            addMessage("assistant", "⚠️ Error de conexión con el backend.");
+        } finally {
+            document.getElementById('loadingChat').style.display = 'none';
         }
+    }
 
-        // --- CHAT ESTRATÉGICO ---
-        async function preguntar() {
-            const input = document.getElementById('pregunta');
-            const texto = input.value.trim();
-            if (!texto) return;
-
-            addMessage("user", texto);
-            input.value = "";
-            document.getElementById('loadingChat').style.display = 'block';
-
-            try {
-                const res = await fetch(`${API_URL}/chat`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ question: texto }),
-                    credentials: 'include'
-                });
-
-                if (res.status === 401) return redirigirALogin();
-
-                const data = await res.json();
-                addMessage("assistant", data.respuesta.replace(/\n/g, "<br>"), true);
-            } catch (e) {
-                addMessage("assistant", "⚠️ Error de conexión con el backend.");
-            } finally {
-                document.getElementById('loadingChat').style.display = 'none';
-            }
-        }
-
-        function addMessage(role, text, isHTML = false) {
-            const div = document.createElement('div');
-            div.className = `msg ${role}`;
-            div.innerHTML = isHTML ? text : text;
-            const chatWindow = document.getElementById('chat-window');
-            chatWindow.appendChild(div);
-            chatWindow.scrollTop = chatWindow.scrollHeight;
-        }
-    </script>
+    function addMessage(role, text, isHTML = false) {
+        const div = document.createElement('div');
+        div.className = `msg ${role}`;
+        div.innerHTML = text; // Simplificado
+        const chatWindow = document.getElementById('chat-window');
+        chatWindow.appendChild(div);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+</script>
 </body>
 
 </html>
