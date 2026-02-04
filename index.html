@@ -147,45 +147,45 @@
     let chatHistory = []; 
 
     // --- CARGA INICIAL ---
-    // Eliminamos el fetch de validación aquí para romper el bucle infinito.
-    // Azure Static Web Apps bloqueará el acceso mediante el archivo de configuración.
+    // Dejamos que Azure Static Web Apps bloquee el acceso mediante el archivo JSON.
+    // Ya no hacemos redirecciones manuales aquí para evitar el bucle infinito.
     window.onload = function() {
-        console.log("Aplicación cargada. La seguridad es gestionada por Azure.");
+        console.log("Sesión gestionada por Azure. Aplicación lista.");
     };
 
     function redirigirALogin() {
-        // Solo redirigimos si una acción del usuario (chat/subida) devuelve 401
+        // Solo llamamos a esta función si una petición de datos falla con 401
         window.location.href = `/.auth/login/microsoftonline?post_login_redirect_url=${window.location.href}`;
     }
 
     // --- SUBIDA DE ARCHIVOS ---
     async function subir() {
         const file = document.getElementById('fileInput').files[0];
-        if(!file) return alert("Por favor selecciona un archivo primero.");
+        if(!file) return alert("Por favor selecciona un archivo.");
         
         const statusDiv = document.getElementById('statusUpload');
-        statusDiv.innerText = "⏳ Procesando documento...";
+        statusDiv.innerText = "⏳ Procesando documento técnico...";
         statusDiv.style.color = "blue";
 
         const formData = new FormData();
-        formData.append("file_transcripcion", file);
+        formData.append("file_transcripcion", file); 
         formData.append("file_presentacion", file); 
         
         try {
             const res = await fetch(`${API_URL}/automatizacion/generar-acta-comite-dual`, { 
                 method: 'POST', 
                 body: formData,
-                credentials: 'include' // Necesario por la configuración de CORS
+                credentials: 'include' // Obligatorio por configuración de CORS
             });
             
             if (res.status === 401) return redirigirALogin();
-            if (!res.ok) throw new Error("Fallo en el procesamiento del acta.");
+            if (!res.ok) throw new Error("Error en procesamiento de Azure OCR");
             
             const blob = await res.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `Acta_Procesada_${new Date().getTime()}.docx`;
+            a.download = `Acta_SierraCol_${new Date().getTime()}.docx`;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -220,30 +220,14 @@
             
             const data = await res.json();
             addMessage("assistant", data.respuesta.replace(/\n/g, "<br>"), true);
-
         } catch(e) {
-            addMessage("assistant", "⚠️ Error de conexión con el experto.");
+            addMessage("assistant", "⚠️ Error de conexión con la API protegida.");
         } finally {
             document.getElementById('loadingChat').style.display = 'none';
         }
     }
 
-    // --- EXPORTAR A PDF ---
-    function exportarPDF() {
-        const element = document.getElementById('editorContent');
-        const opt = {
-            margin: [0.5, 0.8, 0.8, 0.8], 
-            filename: 'Acta_SierraCol.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2 }, 
-            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
-            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-        };
-        html2pdf().set(opt).from(element).save();
-    }
-
-    function cerrarModal() { document.getElementById('actaModal').style.display = "none"; }
-
+    // --- UTILIDADES ---
     function addMessage(role, text, isHTML = false) {
         const div = document.createElement('div');
         div.className = `msg ${role}`;
