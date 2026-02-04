@@ -141,48 +141,45 @@
         </div>
     </div>
 
-    <script>
+   <script>
     // --- CONFIGURACIÓN ---
     const API_URL = "https://api-experto-en-actas.salmonflower-73fd32d3.eastus.azurecontainerapps.io"; 
     let chatHistory = []; 
 
     // --- CARGA INICIAL ---
-    // Dejamos que Azure Static Web Apps maneje el bloqueo de acceso.
-    // El script solo se ejecutará si el usuario ya está autenticado por Azure.
+    // Eliminamos el fetch de validación aquí para romper el bucle infinito.
+    // Azure Static Web Apps bloqueará el acceso mediante el archivo de configuración.
     window.onload = function() {
-        console.log("Sesión validada por el portal. Aplicación lista.");
+        console.log("Aplicación cargada. La seguridad es gestionada por Azure.");
     };
 
     function redirigirALogin() {
-        // Redirección limpia al flujo de login de Microsoft
-        const loginUrl = `/.auth/login/microsoftonline?post_login_redirect_url=${window.location.href}`;
-        window.location.href = loginUrl;
+        // Solo redirigimos si una acción del usuario (chat/subida) devuelve 401
+        window.location.href = `/.auth/login/microsoftonline?post_login_redirect_url=${window.location.href}`;
     }
 
-    // --- SUBIDA DE ARCHIVOS (v29 Ready para >4MB) ---
+    // --- SUBIDA DE ARCHIVOS ---
     async function subir() {
         const file = document.getElementById('fileInput').files[0];
         if(!file) return alert("Por favor selecciona un archivo primero.");
         
         const statusDiv = document.getElementById('statusUpload');
-        statusDiv.innerText = "⏳ Procesando en Azure Document Intelligence...";
+        statusDiv.innerText = "⏳ Procesando documento...";
         statusDiv.style.color = "blue";
 
         const formData = new FormData();
-        // Importante: El backend dual espera 'file_transcripcion' y 'file_presentacion'
-        // Aquí enviamos el archivo cargado como la transcripción para generar el acta
-        formData.append("file_transcripcion", file); 
-        formData.append("file_presentacion", file); // Usamos el mismo archivo si es un acta completa
+        formData.append("file_transcripcion", file);
+        formData.append("file_presentacion", file); 
         
         try {
             const res = await fetch(`${API_URL}/automatizacion/generar-acta-comite-dual`, { 
                 method: 'POST', 
                 body: formData,
-                credentials: 'include' // Obligatorio para pasar cookies de sesión
+                credentials: 'include' // Necesario por la configuración de CORS
             });
             
             if (res.status === 401) return redirigirALogin();
-            if (!res.ok) throw new Error("Error técnico en el procesamiento del PDF");
+            if (!res.ok) throw new Error("Fallo en el procesamiento del acta.");
             
             const blob = await res.blob();
             const url = window.URL.createObjectURL(blob);
@@ -193,10 +190,10 @@
             a.click();
             a.remove();
 
-            statusDiv.innerText = "✅ Acta generada con cifras técnicas.";
+            statusDiv.innerText = "✅ Acta generada con éxito.";
             statusDiv.style.color = "green";
         } catch(e) { 
-            statusDiv.innerText = "❌ Error: Verifique el tamaño del archivo o la sesión.";
+            statusDiv.innerText = "❌ Error: Verifique sesión o tamaño del archivo.";
             statusDiv.style.color = "red";
         }
     }
@@ -212,12 +209,10 @@
         document.getElementById('loadingChat').style.display = 'block';
 
         try {
-            const payload = { question: texto };
-
             const res = await fetch(`${API_URL}/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
+                body: JSON.stringify({ question: texto }),
                 credentials: 'include'
             });
             
@@ -227,35 +222,9 @@
             addMessage("assistant", data.respuesta.replace(/\n/g, "<br>"), true);
 
         } catch(e) {
-            addMessage("assistant", "⚠️ Error de conexión con el motor de búsqueda.");
+            addMessage("assistant", "⚠️ Error de conexión con el experto.");
         } finally {
             document.getElementById('loadingChat').style.display = 'none';
-        }
-    }
-
-    // --- GENERADOR DE ACTAS DESDE CHAT ---
-    async function generarBorrador(blobName) {
-        const statusDiv = document.getElementById('loadingChat');
-        statusDiv.innerText = "⚙️ Cruzando información con el PDF...";
-        statusDiv.style.display = 'block';
-
-        try {
-            const res = await fetch(`${API_URL}/generar-borrador-acta`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ blob_name: blobName }),
-                credentials: 'include'
-            });
-
-            if (res.status === 401) return redirigirALogin();
-            const data = await res.json();
-            document.getElementById('editorContent').innerHTML = data.html_acta;
-            document.getElementById('actaModal').style.display = "block";
-
-        } catch(e) {
-            alert("No se pudo generar el borrador.");
-        } finally {
-            statusDiv.style.display = 'none';
         }
     }
 
@@ -264,7 +233,7 @@
         const element = document.getElementById('editorContent');
         const opt = {
             margin: [0.5, 0.8, 0.8, 0.8], 
-            filename: 'Acta_Comite_SierraCol.pdf',
+            filename: 'Acta_SierraCol.pdf',
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2 }, 
             jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
@@ -282,7 +251,6 @@
         const chatWindow = document.getElementById('chat-window');
         chatWindow.appendChild(div);
         chatWindow.scrollTop = chatWindow.scrollHeight;
-        chatHistory.push({ role: role, content: text });
     }
 </script>
 </body>
