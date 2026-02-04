@@ -142,177 +142,161 @@
     </div>
 
     <script>
-        // --- CONFIGURACIÓN ---
-        // Asegúrate de que coincida con tu URL de Azure Container Apps
-        const API_URL = "https://api-experto-en-actas.salmonflower-73fd32d3.eastus.azurecontainerapps.io"; 
+    // --- CONFIGURACIÓN ---
+    const API_URL = "https://api-experto-en-actas.salmonflower-73fd32d3.eastus.azurecontainerapps.io"; 
+    let chatHistory = []; 
+
+    // --- PROTECCIÓN DE RUTA (LOGIN OBLIGATORIO) ---
+    // Al cargar la página, verificamos si hay sesión. 
+    // Azure Container Apps maneja esto mediante la cookie de autenticación.
+    window.onload = async function() {
+        try {
+            const res = await fetch(`${API_URL}/chat`, { 
+                method: 'OPTIONS', // Prueba rápida sin enviar datos
+                credentials: 'include' 
+            });
+            if (res.status === 401) {
+                redirigirALogin();
+            }
+        } catch (e) {
+            console.log("Esperando interacción o validando sesión...");
+        }
+    };
+
+    function redirigirALogin() {
+        // Redirige al flujo nativo de Microsoft Entra ID configurado en la Container App
+        window.location.href = `${API_URL}/.auth/login/microsoftonline?post_login_redirect_url=${window.location.href}`;
+    }
+
+    // --- SUBIDA DE ARCHIVOS (v29 Ready para >4MB) ---
+    async function subir() {
+        const file = document.getElementById('fileInput').files[0];
+        if(!file) return alert("Por favor selecciona un archivo primero.");
         
-        let chatHistory = []; 
+        const statusDiv = document.getElementById('statusUpload');
+        statusDiv.innerText = "⏳ Procesando en Azure Document Intelligence...";
+        statusDiv.style.color = "blue";
 
-        // --- SUBIDA DE ARCHIVOS ---
-        async function subir() {
-            const file = document.getElementById('fileInput').files[0];
-            if(!file) return alert("Por favor selecciona un archivo primero.");
+        const formData = new FormData();
+        formData.append("file_transcripcion", file); // Ajustado a los nombres del backend dual
+        
+        try {
+            // Se usa credentials: 'include' para pasar la identidad del usuario
+            const res = await fetch(`${API_URL}/automatizacion/generar-acta-comite-dual`, { 
+                method: 'POST', 
+                body: formData,
+                credentials: 'include' 
+            });
             
-            const statusDiv = document.getElementById('statusUpload');
-            statusDiv.innerText = "⏳ Procesando documento (esto puede tardar unos segundos)...";
-            statusDiv.style.color = "blue";
-
-            const formData = new FormData();
-            formData.append("file", file);
+            if (res.status === 401) return redirigirALogin();
+            if (!res.ok) throw new Error("Error en el procesamiento técnico");
             
-            try {
-                // NOTA: Usamos /procesar-acta porque así está definido en el backend v16
-                const res = await fetch(`${API_URL}/procesar-acta`, { method: 'POST', body: formData });
-                
-                if (!res.ok) throw new Error("Error en el servidor");
-                
-                const data = await res.json();
-                statusDiv.innerHTML = `✅ <b>${data.mensaje}</b> <a href="${data.url_sas}" target="_blank">Ver Archivo</a>`;
-                statusDiv.style.color = "green";
-            } catch(e) { 
-                statusDiv.innerText = "❌ Error: " + e.message;
-                statusDiv.style.color = "red";
-            }
+            // Si el backend devuelve el archivo directamente (StreamingResponse)
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Acta_Procesada_${new Date().getTime()}.docx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+
+            statusDiv.innerText = "✅ Acta generada y descargada con éxito.";
+            statusDiv.style.color = "green";
+        } catch(e) { 
+            statusDiv.innerText = "❌ Error: Verifique permisos o tamaño del archivo.";
+            statusDiv.style.color = "red";
         }
+    }
 
-        // --- CHAT ---
-        async function preguntar() {
-            const input = document.getElementById('pregunta');
-            const texto = input.value.trim();
-            if(!texto) return;
+    // --- CHAT ESTRATÉGICO ---
+    async function preguntar() {
+        const input = document.getElementById('pregunta');
+        const texto = input.value.trim();
+        if(!texto) return;
 
-            addMessage("user", texto);
-            input.value = "";
-            document.getElementById('loadingChat').style.display = 'block';
+        addMessage("user", texto);
+        input.value = "";
+        document.getElementById('loadingChat').style.display = 'block';
 
-            try {
-                const payload = { question: texto, history: chatHistory };
+        try {
+            const payload = { question: texto };
 
-                const res = await fetch(`${API_URL}/chat`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                
-                const data = await res.json();
-
-                // Formatear respuesta
-                let contentHTML = data.respuesta.replace(/\n/g, "<br>");
-                
-                // Procesar Fuentes y Detectar Transcripciones
-                if(data.fuentes && data.fuentes.length > 0){
-                    contentHTML += `<div class='sources'><strong>📚 Fuentes Consultadas:</strong>`;
-                    
-                    data.fuentes.forEach(f => {
-                        let btnActa = "";
-                        // Lógica clave: Si es transcripción, mostrar botón de crear acta
-                        if (f.tipo && (f.tipo.includes('transcripcion') || f.tipo.includes('docx') || f.tipo.includes('vtt'))) {
-                            btnActa = `<button class="btn-crear-acta" onclick="generarBorrador('${f.blob_name}')">📝 Crear Acta</button>`;
-                        }
-
-                        contentHTML += `
-                            <div class="source-item">
-                                <span>📄 <a href="${f.link}" class="download-link" target="_blank">${f.nombre}</a></span>
-                                ${btnActa}
-                            </div>`;
-                    });
-                    contentHTML += `</div>`;
-                }
-
-                addMessage("assistant", contentHTML, true);
-
-            } catch(e) {
-                addMessage("assistant", "⚠️ Error de conexión: " + e);
-            } finally {
-                document.getElementById('loadingChat').style.display = 'none';
-            }
-        }
-
-        // --- GENERADOR DE ACTAS (NUEVO) ---
-        async function generarBorrador(blobName) {
-            // Mostrar loading global o alerta
-            const statusDiv = document.getElementById('loadingChat');
-            statusDiv.innerText = "⚙️ Generando borrador de acta formal... (Esto toma unos 10-20 segundos)";
-            statusDiv.style.display = 'block';
-
-            try {
-                const res = await fetch(`${API_URL}/generar-borrador-acta`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ blob_name: blobName })
-                });
-
-                if (!res.ok) throw new Error("Fallo en la generación");
-
-                const data = await res.json();
-                
-                // Inyectar HTML en el editor
-                document.getElementById('editorContent').innerHTML = data.html_acta;
-                
-                // Abrir Modal
-                document.getElementById('actaModal').style.display = "block";
-
-            } catch(e) {
-                alert("Error generando el acta: " + e.message);
-            } finally {
-                statusDiv.innerText = "🧠 Analizando documentos..."; // Reset texto loading
-                statusDiv.style.display = 'none';
-            }
-        }
-
-        // --- EXPORTAR A PDF ---
-        function exportarPDF() {
-            const element = document.getElementById('editorContent');
+            const res = await fetch(`${API_URL}/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                credentials: 'include' // Obligatorio para evitar 401
+            });
             
-            const opt = {
-                // Márgenes: [Arriba, Derecha, Abajo, Izquierda]
-                margin:       [0.5, 0.8, 0.8, 0.8], 
-                filename:     'Borrador_Acta.pdf',
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, scrollY: 0 }, 
-                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
-                
-                // --- LA SOLUCIÓN MÁGICA ---
-                // 'avoid-all': Intenta no cortar NINGÚN elemento por la mitad.
-                // 'css': Respeta las reglas CSS que pusimos arriba.
-                // 'legacy': Usa algoritmos antiguos como respaldo.
-                pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
-            };
+            if (res.status === 401) return redirigirALogin();
             
-            html2pdf().set(opt).from(element).save();
-        }
-
-        // --- UTILIDADES ---
-        function cerrarModal() {
-            document.getElementById('actaModal').style.display = "none";
-        }
-
-        // Cerrar modal si clic fuera
-        window.onclick = function(event) {
-            const modal = document.getElementById('actaModal');
-            if (event.target == modal) {
-                modal.style.display = "none";
-            }
-        }
-
-        function addMessage(role, text, isHTML = false) {
-            const div = document.createElement('div');
-            div.className = `msg ${role}`;
-            if(isHTML) div.innerHTML = text;
-            else div.innerText = text;
+            const data = await res.json();
+            let contentHTML = data.respuesta.replace(/\n/g, "<br>");
             
-            const chatWindow = document.getElementById('chat-window');
-            chatWindow.appendChild(div);
-            chatWindow.scrollTop = chatWindow.scrollHeight;
+            addMessage("assistant", contentHTML, true);
 
-            if (role === 'user' || !isHTML) {
-                chatHistory.push({ role: role, content: text });
-            } else {
-                 // Limpiamos el HTML para no ensuciar el contexto de OpenAI
-                 let cleanText = text.split("<div class='sources'>")[0].replace(/<br>/g, "\n").replace(/<[^>]*>?/gm, '');
-                 chatHistory.push({ role: role, content: cleanText });
-            }
+        } catch(e) {
+            addMessage("assistant", "⚠️ Error de autenticación o conexión.");
+        } finally {
+            document.getElementById('loadingChat').style.display = 'none';
         }
-    </script>
+    }
+
+    // --- GENERADOR DE ACTAS DESDE CHAT ---
+    async function generarBorrador(blobName) {
+        const statusDiv = document.getElementById('loadingChat');
+        statusDiv.innerText = "⚙️ Generando borrador técnico...";
+        statusDiv.style.display = 'block';
+
+        try {
+            const res = await fetch(`${API_URL}/generar-borrador-acta`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ blob_name: blobName }),
+                credentials: 'include'
+            });
+
+            if (res.status === 401) return redirigirALogin();
+            if (!res.ok) throw new Error("Fallo en la generación");
+
+            const data = await res.json();
+            document.getElementById('editorContent').innerHTML = data.html_acta;
+            document.getElementById('actaModal').style.display = "block";
+
+        } catch(e) {
+            alert("Error: No se pudo cruzar la información del PDF.");
+        } finally {
+            statusDiv.style.display = 'none';
+        }
+    }
+
+    // --- EXPORTAR A PDF ---
+    function exportarPDF() {
+        const element = document.getElementById('editorContent');
+        const opt = {
+            margin: [0.5, 0.8, 0.8, 0.8], 
+            filename: 'Acta_SierraCol_Oficial.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 }, 
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        };
+        html2pdf().set(opt).from(element).save();
+    }
+
+    // --- UTILIDADES ---
+    function cerrarModal() { document.getElementById('actaModal').style.display = "none"; }
+
+    function addMessage(role, text, isHTML = false) {
+        const div = document.createElement('div');
+        div.className = `msg ${role}`;
+        div.innerHTML = isHTML ? text : text;
+        const chatWindow = document.getElementById('chat-window');
+        chatWindow.appendChild(div);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+        chatHistory.push({ role: role, content: text });
+    }
+</script>
 </body>
 </html>
