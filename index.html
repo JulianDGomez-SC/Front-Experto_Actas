@@ -362,9 +362,8 @@
         };
 
         function redirigirALogin() {
-            // Usamos la dirección exacta
-            const frontUrl = "https://proud-hill-0c226890f.6.azurestaticapps.net";
-            const loginUrl = `${API_URL}/.auth/login/aad?post_login_redirect_url=${frontUrl}`;
+            // No uses el API_URL aquí. Usa la ruta relativa de la SWA.
+            const loginUrl = `/.auth/login/aad?post_login_redirect_uri=/`;
             window.location.href = loginUrl;
         }
 
