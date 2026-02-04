@@ -1,62 +1,212 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestor de Actas Inteligente v2.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; background-color: #f4f7f6; }
-        .container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; }
-        h1, h2 { color: #2c3e50; text-align: center; }
-        
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f7f6;
+        }
+
+        .container {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            margin-bottom: 25px;
+        }
+
+        h1,
+        h2 {
+            color: #2c3e50;
+            text-align: center;
+        }
+
         /* Chat Area */
-        #chat-window { height: 450px; overflow-y: auto; border: 1px solid #ddd; padding: 20px; margin-bottom: 15px; border-radius: 8px; background: #fff; display: flex; flex-direction: column; gap: 15px; }
-        .msg { padding: 12px 18px; border-radius: 10px; max-width: 85%; line-height: 1.6; font-size: 0.95em; }
-        .msg.user { background-color: #3498db; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
-        .msg.assistant { background-color: #ecf0f1; color: #2c3e50; align-self: flex-start; border-left: 4px solid #2ecc71; border-bottom-left-radius: 2px; }
-        
+        #chat-window {
+            height: 450px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .msg {
+            padding: 12px 18px;
+            border-radius: 10px;
+            max-width: 85%;
+            line-height: 1.6;
+            font-size: 0.95em;
+        }
+
+        .msg.user {
+            background-color: #3498db;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+
+        .msg.assistant {
+            background-color: #ecf0f1;
+            color: #2c3e50;
+            align-self: flex-start;
+            border-left: 4px solid #2ecc71;
+            border-bottom-left-radius: 2px;
+        }
+
         /* Fuentes y Botones */
-        .sources { font-size: 0.85em; margin-top: 10px; padding-top: 10px; border-top: 1px solid #dcdcdc; color: #555; display: flex; flex-direction: column; gap: 5px; }
-        .source-item { display: flex; align-items: center; justify-content: space-between; background: #f9f9f9; padding: 5px 10px; border-radius: 5px; }
-        .download-link { color: #e67e22; text-decoration: none; font-weight: bold; }
-        .download-link:hover { text-decoration: underline; }
-        
+        .sources {
+            font-size: 0.85em;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #dcdcdc;
+            color: #555;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .source-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f9f9f9;
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+
+        .download-link {
+            color: #e67e22;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .download-link:hover {
+            text-decoration: underline;
+        }
+
         /* Botón Mágico Crear Acta */
         .btn-crear-acta {
-            background-color: #27ae60; color: white; border: none; padding: 4px 10px; 
-            border-radius: 4px; cursor: pointer; font-size: 0.8em; margin-left: 10px;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8em;
+            margin-left: 10px;
             transition: transform 0.2s;
         }
-        .btn-crear-acta:hover { transform: scale(1.05); background-color: #219150; }
+
+        .btn-crear-acta:hover {
+            transform: scale(1.05);
+            background-color: #219150;
+        }
 
         /* Input Area */
-        .input-area { display: flex; gap: 10px; }
-        input[type="text"] { flex-grow: 1; padding: 12px; border: 1px solid #ccc; border-radius: 6px; outline: none; }
-        input[type="text"]:focus { border-color: #3498db; }
-        button.send-btn { padding: 12px 25px; background: #2c3e50; color: white; border: none; border-radius: 6px; cursor: pointer; }
-        button.send-btn:hover { background: #34495e; }
-        .loading { color: #7f8c8d; font-style: italic; font-size: 0.9em; text-align: center; display: none; margin-top: 5px; }
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex-grow: 1;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: #3498db;
+        }
+
+        button.send-btn {
+            padding: 12px 25px;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        button.send-btn:hover {
+            background: #34495e;
+        }
+
+        .loading {
+            color: #7f8c8d;
+            font-style: italic;
+            font-size: 0.9em;
+            text-align: center;
+            display: none;
+            margin-top: 5px;
+        }
 
         /* --- MODAL EDITOR DE ACTA --- */
-        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); backdrop-filter: blur(2px); }
-        .modal-content { background-color: #fefefe; margin: 2% auto; padding: 0; border: 1px solid #888; width: 21cm; min-height: 29.7cm; border-radius: 8px; box-shadow: 0 4px 25px rgba(0,0,0,0.2); display: flex; flex-direction: column; }
-        
-        .modal-header { padding: 15px 20px; background: #2c3e50; color: white; display: flex; justify-content: space-between; align-items: center; border-top-left-radius: 8px; border-top-right-radius: 8px; }
-        
-        .modal-body { 
-            padding: 30px; 
-            padding-top: 10px; /* Mucho menos espacio arriba */
-            overflow-y: auto; 
-            background: white; 
-            color: black; 
-            line-height: 1.5; 
-            flex-grow: 1; 
-            outline: none; 
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(2px);
         }
-        
-        
-        #editorContent > h1:first-child {
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 2% auto;
+            padding: 0;
+            border: 1px solid #888;
+            width: 21cm;
+            min-height: 29.7cm;
+            border-radius: 8px;
+            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 15px 20px;
+            background: #2c3e50;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+        .modal-body {
+            padding: 30px;
+            padding-top: 10px;
+            /* Mucho menos espacio arriba */
+            overflow-y: auto;
+            background: white;
+            color: black;
+            line-height: 1.5;
+            flex-grow: 1;
+            outline: none;
+        }
+
+
+        #editorContent>h1:first-child {
             margin-top: 0;
             padding-top: 10px;
         }
@@ -68,21 +218,75 @@
             font-size: 12pt;
         }
 
-        .modal-actions { padding: 10px; background: #ecf0f1; text-align: right; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
-        .btn-modal { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-left: 10px; }
-        .btn-save { background: #e74c3c; color: white; } /* Rojo PDF */
-        .btn-close { background: #95a5a6; color: white; }
+        .modal-actions {
+            padding: 10px;
+            background: #ecf0f1;
+            text-align: right;
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
+        }
+
+        .btn-modal {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .btn-save {
+            background: #e74c3c;
+            color: white;
+        }
+
+        /* Rojo PDF */
+        .btn-close {
+            background: #95a5a6;
+            color: white;
+        }
 
         /* Estilos básicos para el acta generada (Tablas, etc) */
-        .modal-body table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 10px; }
-        .modal-body th, .modal-body td { border: 1px solid black; padding: 8px; text-align: left; }
-        .modal-body h1 { font-size: 18pt; text-align: center; color: black; }
-        .modal-body h2 { font-size: 14pt; border-bottom: 1px solid black; padding-bottom: 5px; margin-top: 20px; color: black; text-align: left; }
+        .modal-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+
+        .modal-body th,
+        .modal-body td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .modal-body h1 {
+            font-size: 18pt;
+            text-align: center;
+            color: black;
+        }
+
+        .modal-body h2 {
+            font-size: 14pt;
+            border-bottom: 1px solid black;
+            padding-bottom: 5px;
+            margin-top: 20px;
+            color: black;
+            text-align: left;
+        }
 
         /* Reglas anti-corte para impresión/PDF */
-        p, h1, h2, h3, h4, li {
-            page-break-inside: avoid; /* Para navegadores viejos */
-            break-inside: avoid;      /* Estándar moderno */
+        p,
+        h1,
+        h2,
+        h3,
+        h4,
+        li {
+            page-break-inside: avoid;
+            /* Para navegadores viejos */
+            break-inside: avoid;
+            /* Estándar moderno */
         }
 
         /* Especial para tablas: evita que una fila se parta a la mitad */
@@ -90,22 +294,26 @@
             page-break-inside: avoid;
             break-inside: avoid;
         }
-        
+
         /* Asegura que las tablas no se corten raro */
         table {
             page-break-inside: auto;
         }
     </style>
 </head>
+
 <body>
 
     <div class="container">
         <h1>📑 Gestor Inteligente de Actas & Transcripciones</h1>
-        
-        <div style="border: 2px dashed #bdc3c7; padding: 20px; text-align: center; border-radius: 8px; background: #fafafa;">
+
+        <div
+            style="border: 2px dashed #bdc3c7; padding: 20px; text-align: center; border-radius: 8px; background: #fafafa;">
             <p style="margin-bottom: 10px; color: #666;">Sube Actas (PDF) o Transcripciones (DOCX/VTT)</p>
             <input type="file" id="fileInput" accept=".pdf,.docx,.vtt,.doc">
-            <button onclick="subir()" style="background: #2980b9; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">Subir Documento</button>
+            <button onclick="subir()"
+                style="background: #2980b9; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">Subir
+                Documento</button>
             <p id="statusUpload" style="margin-top: 10px; font-weight: bold; min-height: 20px;"></p>
         </div>
     </div>
@@ -113,13 +321,15 @@
     <div class="container">
         <h2>💬 Chat con el Experto</h2>
         <div id="chat-window">
-            <div class="msg assistant">Hola. Puedo analizar actas históricas y generar nuevas actas a partir de transcripciones. ¿En qué te ayudo?</div>
+            <div class="msg assistant">Hola. Puedo analizar actas históricas y generar nuevas actas a partir de
+                transcripciones. ¿En qué te ayudo?</div>
         </div>
-        
+
         <p id="loadingChat" class="loading">🧠 Analizando documentos y cruzando información...</p>
-        
+
         <div class="input-area">
-            <input type="text" id="pregunta" placeholder="Ej: ¿Qué se acordó sobre el presupuesto?" onkeypress="if(event.key==='Enter') preguntar()">
+            <input type="text" id="pregunta" placeholder="Ej: ¿Qué se acordó sobre el presupuesto?"
+                onkeypress="if(event.key==='Enter') preguntar()">
             <button class="send-btn" onclick="preguntar()">Enviar Pregunta</button>
         </div>
     </div>
@@ -130,9 +340,9 @@
                 <span style="font-size: 1.2em; font-weight: bold;">📝 Editor de Borrador de Acta</span>
                 <span style="font-size: 0.9em; opacity: 0.8;">Puedes editar el texto directamente aquí</span>
             </div>
-            
+
             <div id="editorContent" class="modal-body paper-look" contenteditable="true">
-                </div>
+            </div>
 
             <div class="modal-actions">
                 <button class="btn-modal btn-close" onclick="cerrarModal()">Cerrar</button>
@@ -141,101 +351,101 @@
         </div>
     </div>
 
-   <script>
-    // --- CONFIGURACIÓN ---
-    // URL de tu Backend (donde está el motor de IA y el OCR)
-    const API_URL = "https://api-experto-en-actas.salmonflower-73fd32d3.eastus.azurecontainerapps.io"; 
-    let chatHistory = []; 
+    <script>
+        // --- CONFIGURACIÓN ---
+        // URL de tu Backend (donde está el motor de IA y el OCR)
+        const API_URL = "https://api-experto-en-actas.salmonflower-73fd32d3.eastus.azurecontainerapps.io";
+        let chatHistory = [];
 
-    window.onload = function() {
-        console.log("Sistema SierraCol listo. Autenticación vinculada al Backend.");
-    };
+        window.onload = function () {
+            console.log("Sistema SierraCol listo. Autenticación vinculada al Backend.");
+        };
 
-    function redirigirALogin() {
-        // Usamos la dirección exacta que descubriste que funciona:
-        // Se añade el parámetro post_login_redirect_url para que vuelva al front tras el éxito.
-        const loginUrl = `${API_URL}/.auth/login/aad?post_login_redirect_url=${window.location.href}`;
-        console.log("Redirigiendo a login en Container Apps...");
-        window.location.href = loginUrl;
-    }
-
-    // --- SUBIDA DE ARCHIVOS (OCR v29+) ---
-    async function subir() {
-        const file = document.getElementById('fileInput').files[0];
-        if(!file) return alert("Selecciona un archivo primero.");
-        
-        const statusDiv = document.getElementById('statusUpload');
-        statusDiv.innerText = "⏳ Procesando en Azure Intelligence (Fidelidad 98%)...";
-        statusDiv.style.color = "blue";
-
-        const formData = new FormData();
-        formData.append("file_transcripcion", file);
-        formData.append("file_presentacion", file); 
-        
-        try {
-            const res = await fetch(`${API_URL}/automatizacion/generar-acta-comite-dual`, { 
-                method: 'POST', 
-                body: formData,
-                credentials: 'include' // Crucial para enviar la cookie de /aad
-            });
-            
-            if (res.status === 401) return redirigirALogin();
-            if (!res.ok) throw new Error("Fallo en la extracción de datos.");
-            
-            const blob = await res.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `Acta_SierraCol_${new Date().getTime()}.docx`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-
-            statusDiv.innerText = "✅ Acta generada con datos técnicos exitosamente.";
-            statusDiv.style.color = "green";
-        } catch(e) { 
-            statusDiv.innerText = "❌ Error: Sesión expirada o archivo muy pesado.";
-            statusDiv.style.color = "red";
+        function redirigirALogin() {
+            // Usamos la dirección exacta
+            const frontUrl = "https://proud-hill-0c226890f.6.azurestaticapps.net";
+            const loginUrl = `${API_URL}/.auth/login/aad?post_login_redirect_url=${frontUrl}`;
+            window.location.href = loginUrl;
         }
-    }
 
-    // --- CHAT ESTRATÉGICO ---
-    async function preguntar() {
-        const input = document.getElementById('pregunta');
-        const texto = input.value.trim();
-        if(!texto) return;
+        // --- SUBIDA DE ARCHIVOS (OCR v29+) ---
+        async function subir() {
+            const file = document.getElementById('fileInput').files[0];
+            if (!file) return alert("Selecciona un archivo primero.");
 
-        addMessage("user", texto);
-        input.value = "";
-        document.getElementById('loadingChat').style.display = 'block';
+            const statusDiv = document.getElementById('statusUpload');
+            statusDiv.innerText = "⏳ Procesando en Azure Intelligence (Fidelidad 98%)...";
+            statusDiv.style.color = "blue";
 
-        try {
-            const res = await fetch(`${API_URL}/chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question: texto }),
-                credentials: 'include'
-            });
-            
-            if (res.status === 401) return redirigirALogin();
-            
-            const data = await res.json();
-            addMessage("assistant", data.respuesta.replace(/\n/g, "<br>"), true);
-        } catch(e) {
-            addMessage("assistant", "⚠️ Error de conexión con el backend.");
-        } finally {
-            document.getElementById('loadingChat').style.display = 'none';
+            const formData = new FormData();
+            formData.append("file_transcripcion", file);
+            formData.append("file_presentacion", file);
+
+            try {
+                const res = await fetch(`${API_URL}/automatizacion/generar-acta-comite-dual`, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'include' // Crucial para enviar la cookie de /aad
+                });
+
+                if (res.status === 401) return redirigirALogin();
+                if (!res.ok) throw new Error("Fallo en la extracción de datos.");
+
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Acta_SierraCol_${new Date().getTime()}.docx`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+
+                statusDiv.innerText = "✅ Acta generada con datos técnicos exitosamente.";
+                statusDiv.style.color = "green";
+            } catch (e) {
+                statusDiv.innerText = "❌ Error: Sesión expirada o archivo muy pesado.";
+                statusDiv.style.color = "red";
+            }
         }
-    }
 
-    function addMessage(role, text, isHTML = false) {
-        const div = document.createElement('div');
-        div.className = `msg ${role}`;
-        div.innerHTML = isHTML ? text : text;
-        const chatWindow = document.getElementById('chat-window');
-        chatWindow.appendChild(div);
-        chatWindow.scrollTop = chatWindow.scrollHeight;
-    }
-</script>
+        // --- CHAT ESTRATÉGICO ---
+        async function preguntar() {
+            const input = document.getElementById('pregunta');
+            const texto = input.value.trim();
+            if (!texto) return;
+
+            addMessage("user", texto);
+            input.value = "";
+            document.getElementById('loadingChat').style.display = 'block';
+
+            try {
+                const res = await fetch(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: texto }),
+                    credentials: 'include'
+                });
+
+                if (res.status === 401) return redirigirALogin();
+
+                const data = await res.json();
+                addMessage("assistant", data.respuesta.replace(/\n/g, "<br>"), true);
+            } catch (e) {
+                addMessage("assistant", "⚠️ Error de conexión con el backend.");
+            } finally {
+                document.getElementById('loadingChat').style.display = 'none';
+            }
+        }
+
+        function addMessage(role, text, isHTML = false) {
+            const div = document.createElement('div');
+            div.className = `msg ${role}`;
+            div.innerHTML = isHTML ? text : text;
+            const chatWindow = document.getElementById('chat-window');
+            chatWindow.appendChild(div);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+    </script>
 </body>
+
 </html>
