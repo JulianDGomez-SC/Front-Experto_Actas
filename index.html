@@ -143,43 +143,44 @@
 
    <script>
     // --- CONFIGURACIÓN ---
+    // URL de tu Backend (donde está el motor de IA y el OCR)
     const API_URL = "https://api-experto-en-actas.salmonflower-73fd32d3.eastus.azurecontainerapps.io"; 
     let chatHistory = []; 
 
-    // --- CARGA INICIAL ---
-    // Dejamos que Azure Static Web Apps bloquee el acceso mediante el archivo JSON.
-    // Ya no hacemos redirecciones manuales aquí para evitar el bucle infinito.
     window.onload = function() {
-        console.log("Sesión gestionada por Azure. Aplicación lista.");
+        console.log("Sistema SierraCol listo. Autenticación vinculada al Backend.");
     };
 
     function redirigirALogin() {
-        // Solo llamamos a esta función si una petición de datos falla con 401
-        window.location.href = `/.auth/login/microsoftonline?post_login_redirect_url=${window.location.href}`;
+        // Usamos la dirección exacta que descubriste que funciona:
+        // Se añade el parámetro post_login_redirect_url para que vuelva al front tras el éxito.
+        const loginUrl = `${API_URL}/.auth/login/aad?post_login_redirect_url=${window.location.href}`;
+        console.log("Redirigiendo a login en Container Apps...");
+        window.location.href = loginUrl;
     }
 
-    // --- SUBIDA DE ARCHIVOS ---
+    // --- SUBIDA DE ARCHIVOS (OCR v29+) ---
     async function subir() {
         const file = document.getElementById('fileInput').files[0];
-        if(!file) return alert("Por favor selecciona un archivo.");
+        if(!file) return alert("Selecciona un archivo primero.");
         
         const statusDiv = document.getElementById('statusUpload');
-        statusDiv.innerText = "⏳ Procesando documento técnico...";
+        statusDiv.innerText = "⏳ Procesando en Azure Intelligence (Fidelidad 98%)...";
         statusDiv.style.color = "blue";
 
         const formData = new FormData();
-        formData.append("file_transcripcion", file); 
+        formData.append("file_transcripcion", file);
         formData.append("file_presentacion", file); 
         
         try {
             const res = await fetch(`${API_URL}/automatizacion/generar-acta-comite-dual`, { 
                 method: 'POST', 
                 body: formData,
-                credentials: 'include' // Obligatorio por configuración de CORS
+                credentials: 'include' // Crucial para enviar la cookie de /aad
             });
             
             if (res.status === 401) return redirigirALogin();
-            if (!res.ok) throw new Error("Error en procesamiento de Azure OCR");
+            if (!res.ok) throw new Error("Fallo en la extracción de datos.");
             
             const blob = await res.blob();
             const url = window.URL.createObjectURL(blob);
@@ -190,10 +191,10 @@
             a.click();
             a.remove();
 
-            statusDiv.innerText = "✅ Acta generada con éxito.";
+            statusDiv.innerText = "✅ Acta generada con datos técnicos exitosamente.";
             statusDiv.style.color = "green";
         } catch(e) { 
-            statusDiv.innerText = "❌ Error: Verifique sesión o tamaño del archivo.";
+            statusDiv.innerText = "❌ Error: Sesión expirada o archivo muy pesado.";
             statusDiv.style.color = "red";
         }
     }
@@ -221,13 +222,12 @@
             const data = await res.json();
             addMessage("assistant", data.respuesta.replace(/\n/g, "<br>"), true);
         } catch(e) {
-            addMessage("assistant", "⚠️ Error de conexión con la API protegida.");
+            addMessage("assistant", "⚠️ Error de conexión con el backend.");
         } finally {
             document.getElementById('loadingChat').style.display = 'none';
         }
     }
 
-    // --- UTILIDADES ---
     function addMessage(role, text, isHTML = false) {
         const div = document.createElement('div');
         div.className = `msg ${role}`;
