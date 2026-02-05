@@ -308,7 +308,7 @@
         <h1>📑 Gestor Inteligente de Actas & Transcripciones</h1>
 
         <div
-            style="border: 2px dashed #bdc3c7; padding: 20px; text-align: center; border-radius: 8px; background: #fafafa;">
+            style="border: 2px dashed #bdc3c7; padding: 20px; text-align: center; border-radius: 8px; background: #fafafa; display:none;" >
             <p style="margin-bottom: 10px; color: #666;">Sube Actas (PDF) o Transcripciones (DOCX/VTT)</p>
             <input type="file" id="fileInput" accept=".pdf,.docx,.vtt,.doc">
             <button onclick="subir()"
@@ -441,7 +441,13 @@
                 console.log("Datos recibidos:", data); // 3. Ver qué llegó realmente
 
                 // Visualizar respuesta
-                let respuestaHTML = (data.respuesta || "Sin respuesta").replace(/\n/g, "<br>");
+                let textoCrudo = data.respuesta || "Sin respuesta";
+
+                // 1. Convertir negritas (**texto**) a HTML (<strong>texto</strong>)
+                let respuestaHTML = textoCrudo.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+                // 2. Convertir saltos de línea a <br>
+                respuestaHTML = respuestaHTML.replace(/\n/g, "<br>");
 
                 // Agregar fuentes si existen
                 if (data.fuentes && data.fuentes.length > 0) {
