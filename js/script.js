@@ -1,5 +1,4 @@
 // --- CONFIGURACIÓN OPTIMIZADA ---
-// Al estar vinculado en el Portal de Azure, usamos la ruta relativa
 const API_URL = "/api";
 let chatHistory = [];
 
@@ -8,8 +7,6 @@ window.onload = function () {
 };
 
 function redirigirALogin() {
-    // Usamos la ruta nativa de la SWA para el login
-    // Esto evita que el botón 'Return to website' falle
     window.location.href = "/.auth/login/aad?post_login_redirect_uri=/";
 }
 
@@ -27,7 +24,6 @@ async function subir() {
     formData.append("file_presentacion", file);
 
     try {
-        // El fetch ahora es mucho más simple y seguro
         const res = await fetch(`${API_URL}/automatizacion/generar-acta-comite-dual`, {
             method: 'POST',
             body: formData
@@ -65,45 +61,65 @@ async function preguntar() {
     loading.style.display = 'block';
 
     try {
-        console.log("Enviando pregunta:", texto); // 1. Log para depurar
-
         const res = await fetch(`${API_URL}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ question: texto })
         });
 
-        console.log("Status respuesta:", res.status); // 2. Ver status
-
         if (res.status === 401) return redirigirALogin();
 
         if (!res.ok) {
-            // Si el backend falla, leemos el error real
             const errorText = await res.text();
             throw new Error(`Error del servidor (${res.status}): ${errorText}`);
         }
 
         const data = await res.json();
-        console.log("Datos recibidos:", data); // 3. Ver qué llegó realmente
+        console.log("Datos recibidos:", data); 
 
-        // Visualizar respuesta
-        let textoCrudo = data.respuesta || "Sin respuesta";
+        let respuestaHTML = "";
+        const rawData = data.respuesta;
 
-        // 1. Convertir negritas (**texto**) a HTML (<strong>texto</strong>)
-        let respuestaHTML = textoCrudo.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-        // 2. Convertir saltos de línea a <br>
-        respuestaHTML = respuestaHTML.replace(/\n/g, "<br>");
+        // VERIFICACIÓN DE TIPO: ¿Es objeto (SCT 46) o texto simple?
+        if (typeof rawData === 'object' && rawData !== null) {
+            // Caso 1: Objeto estructurado (Análisis estratégico)
+            respuestaHTML += `<div style="border-left: 4px solid #0078d4; padding-left: 10px; margin-bottom: 10px;">`;
+            respuestaHTML += `<h3 style="margin: 0; color: #0078d4;">${rawData.comite || 'Información de Comité'}</h3>`;
+            respuestaHTML += `<small>Fecha de sesión: ${rawData.fecha || 'N/A'}</small></div>`;
+            
+            if (Array.isArray(rawData.temas_discutidos)) {
+                rawData.temas_discutidos.forEach(item => {
+                    respuestaHTML += `<div style="margin-bottom: 15px;">`;
+                    respuestaHTML += `<strong>📌 Tema: ${item.tema}</strong><br>`;
+                    
+                    // Manejar si discusion es array o string
+                    let disc = Array.isArray(item.discusion) ? item.discusion.join(". ") : item.discusion;
+                    respuestaHTML += `<span style="font-size: 0.95em;">${disc}</span><br>`;
+                    
+                    if (item.acuerdos) {
+                        let acue = Array.isArray(item.acuerdos) ? item.acuerdos.join(". ") : item.acuerdos;
+                        respuestaHTML += `<strong style="color: #28a745;">✅ Acuerdos:</strong> <span style="font-size: 0.95em;">${acue}</span>`;
+                    }
+                    respuestaHTML += `</div><hr style="border: 0; border-top: 1px solid #eee;">`;
+                });
+            }
+        } else {
+            // Caso 2: Texto simple o Markdown (Evita el error .replace)
+            let textoCrudo = String(rawData || "Sin respuesta disponible.");
+            respuestaHTML = textoCrudo
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, "<br>");
+        }
 
         // Agregar fuentes si existen
         if (data.fuentes && data.fuentes.length > 0) {
-            respuestaHTML += `<div class="sources"><strong>📚 Fuentes consultadas:</strong>`;
+            respuestaHTML += `<div class="sources" style="margin-top: 20px; border-top: 2px solid #0078d4; padding-top: 10px;">`;
+            respuestaHTML += `<strong>📚 Fuentes consultadas:</strong>`;
             data.fuentes.forEach(f => {
-                // Creamos un link seguro al blob
                 respuestaHTML += `
-                    <div class="source-item">
+                    <div class="source-item" style="margin-top: 8px; font-size: 0.85em;">
                         <span>📄 ${f.nombre}</span>
-                        <a href="${f.link}" target="_blank" class="download-link">Ver Documento</a>
+                        <a href="${f.link}" target="_blank" class="download-link" style="margin-left: 10px;">Ver Documento</a>
                     </div>`;
             });
             respuestaHTML += `</div>`;
@@ -112,8 +128,8 @@ async function preguntar() {
         addMessage("assistant", respuestaHTML, true);
 
     } catch (e) {
-        console.error("Error en el chat:", e); // ¡Aquí veremos el error real en la consola!
-        addMessage("assistant", `⚠️ Ocurrió un error al procesar la respuesta: ${e.message}`);
+        console.error("Error en el chat:", e);
+        addMessage("assistant", `⚠️ Error de procesamiento: ${e.message}`);
     } finally {
         loading.style.display = 'none';
     }
@@ -122,7 +138,6 @@ async function preguntar() {
 function addMessage(role, text, isHTML = false) {
     const div = document.createElement('div');
     div.className = `msg ${role}`;
-    // Usamos innerHTML con cuidado
     if (isHTML) div.innerHTML = text;
     else div.textContent = text;
 
