@@ -80,31 +80,40 @@ async function preguntar() {
         let respuestaHTML = "";
         const rawData = data.respuesta;
 
-        // VERIFICACIÓN DE TIPO: ¿Es objeto (SCT 46) o texto simple?
+        // VERIFICACIÓN DE TIPO: ¿Es objeto estratégico o texto simple?
         if (typeof rawData === 'object' && rawData !== null) {
             // Caso 1: Objeto estructurado (Análisis estratégico)
-            respuestaHTML += `<div style="border-left: 4px solid #0078d4; padding-left: 10px; margin-bottom: 10px;">`;
+            respuestaHTML += `<div style="border-left: 4px solid #0078d4; padding-left: 10px; margin-bottom: 10px; background: #f0f7ff; padding: 10px; border-radius: 0 5px 5px 0;">`;
             respuestaHTML += `<h3 style="margin: 0; color: #0078d4;">${rawData.comite || 'Información de Comité'}</h3>`;
             respuestaHTML += `<small>Fecha de sesión: ${rawData.fecha || 'N/A'}</small></div>`;
             
-            if (Array.isArray(rawData.temas_discutidos)) {
-                rawData.temas_discutidos.forEach(item => {
-                    respuestaHTML += `<div style="margin-bottom: 15px;">`;
-                    respuestaHTML += `<strong>📌 Tema: ${item.tema}</strong><br>`;
+            // Buscamos la lista de temas bajo cualquier nombre posible (acuerdos, temas_discutidos, etc.)
+            const listaTemas = rawData.acuerdos || rawData.temas_discutidos || rawData.puntos || [];
+            
+            if (Array.isArray(listaTemas)) {
+                listaTemas.forEach(item => {
+                    respuestaHTML += `<div style="margin-bottom: 15px; padding: 5px;">`;
+                    respuestaHTML += `<strong style="color: #333; display: block; margin-bottom: 4px;">📌 Tema: ${item.tema || 'Sin título'}</strong>`;
                     
-                    // Manejar si discusion es array o string
-                    let disc = Array.isArray(item.discusion) ? item.discusion.join(". ") : item.discusion;
-                    respuestaHTML += `<span style="font-size: 0.95em;">${disc}</span><br>`;
+                    // Manejar discusión (puede ser string o array)
+                    if (item.discusion) {
+                        let disc = Array.isArray(item.discusion) ? item.discusion.join(". ") : item.discusion;
+                        respuestaHTML += `<div style="font-size: 0.95em; color: #555; margin-bottom: 5px;"><em>Discusión:</em> ${disc}</div>`;
+                    }
                     
+                    // Manejar acuerdos (puede ser string o array)
                     if (item.acuerdos) {
                         let acue = Array.isArray(item.acuerdos) ? item.acuerdos.join(". ") : item.acuerdos;
-                        respuestaHTML += `<strong style="color: #28a745;">✅ Acuerdos:</strong> <span style="font-size: 0.95em;">${acue}</span>`;
+                        respuestaHTML += `<div style="background: #e6f4ea; padding: 5px 8px; border-radius: 4px; font-size: 0.92em;">`;
+                        respuestaHTML += `<strong style="color: #1e7e34;">✅ Acuerdos:</strong> ${acue}</div>`;
                     }
                     respuestaHTML += `</div><hr style="border: 0; border-top: 1px solid #eee;">`;
                 });
+            } else {
+                respuestaHTML += `<p>No se encontraron detalles específicos en el formato de lista.</p>`;
             }
         } else {
-            // Caso 2: Texto simple o Markdown (Evita el error .replace)
+            // Caso 2: Texto simple o Markdown
             let textoCrudo = String(rawData || "Sin respuesta disponible.");
             respuestaHTML = textoCrudo
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -114,12 +123,12 @@ async function preguntar() {
         // Agregar fuentes si existen
         if (data.fuentes && data.fuentes.length > 0) {
             respuestaHTML += `<div class="sources" style="margin-top: 20px; border-top: 2px solid #0078d4; padding-top: 10px;">`;
-            respuestaHTML += `<strong>📚 Fuentes consultadas:</strong>`;
+            respuestaHTML += `<strong style="color: #0078d4;">📚 Fuentes consultadas:</strong>`;
             data.fuentes.forEach(f => {
                 respuestaHTML += `
-                    <div class="source-item" style="margin-top: 8px; font-size: 0.85em;">
+                    <div class="source-item" style="margin-top: 8px; font-size: 0.85em; background: #fff; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
                         <span>📄 ${f.nombre}</span>
-                        <a href="${f.link}" target="_blank" class="download-link" style="margin-left: 10px;">Ver Documento</a>
+                        <a href="${f.link}" target="_blank" class="download-link" style="margin-left: 10px; font-weight: bold; color: #0078d4; text-decoration: none;">Ver Documento</a>
                     </div>`;
             });
             respuestaHTML += `</div>`;
