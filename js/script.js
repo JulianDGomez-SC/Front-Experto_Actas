@@ -11,25 +11,6 @@ function redirigirALogin() {
     window.location.href = "/.auth/login/aad?post_login_redirect_uri=/";
 }
 
-// --- FUNCIÓN FALTANTE: DIBUJAR LOS MENSAJES EN PANTALLA ---
-function addMessage(role, content, isHtml = false) {
-    const chatBox = document.getElementById('chatBox');
-    if (!chatBox) return; // Evita errores si el contenedor no existe
-
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `message ${role}`;
-    
-    if (isHtml) {
-        msgDiv.innerHTML = content;
-    } else {
-        msgDiv.textContent = content;
-    }
-    
-    chatBox.appendChild(msgDiv);
-    chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll hacia abajo
-}
-
-
 // --- MÓDULO 1: GENERACIÓN DE ACTAS (DUAL) ---
 async function subir() {
     const fileInput = document.getElementById('fileInput');
@@ -88,25 +69,7 @@ async function subir() {
     }
 }
 
-// --- FUNCIÓN PARA RENDERIZAR LA RESPUESTA DE LA IA (Markdown a HTML) ---
-function procesarMarkdown(texto) {
-    if (typeof texto !== 'string') return "Respuesta no disponible.";
-    return texto
-        // 1. Elimina el símbolo '#' cuando la IA lo deja solo en una línea
-        .replace(/(^|\n|<br>)\s*#\s*(<br>|$|\n)/g, '') 
-        // 2. Convierte títulos correctamente
-        .replace(/### (.*?)(<br>|$|\n)/g, '<h3 style="color:#0078d4; margin-top:10px; margin-bottom:5px;">$1</h3>')
-        .replace(/## (.*?)(<br>|$|\n)/g, '<h4 style="color:#0078d4; margin-top:10px; margin-bottom:5px;">$1</h4>')
-        .replace(/# (.*?)(<br>|$|\n)/g, '<strong style="color:#0078d4; display:block; margin-top:10px;">$1</strong>')
-        // 3. Negritas e itálicas
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em>$1</em>')
-        // 4. Saltos de línea y listas
-        .replace(/\n/g, "<br>")
-        .replace(/(<br>)- (.*?)(?=<br>|$)/g, '<li style="margin-left:15px;">$2</li>');
-}
-
-// --- MÓDULO 2: CHAT Y PREGUNTAS ---
+// --- MÓDULO 2: CHAT ESTRATÉGICO CON MEMORIA ---
 async function preguntar() {
     const input = document.getElementById('pregunta');
     const texto = input.value.trim();
@@ -117,7 +80,7 @@ async function preguntar() {
     input.value = "";
     
     const loading = document.getElementById('loadingChat');
-    if (loading) loading.style.display = 'block';
+    loading.style.display = 'block';
 
     try {
         // 2. Enviar pregunta E HISTORIAL al backend para mantener contexto
@@ -132,23 +95,9 @@ async function preguntar() {
 
         if (res.status === 401) return redirigirALogin();
         
-        // --- MANEJO DE ERRORES BLINDADO ---
         if (!res.ok) {
-            const errorText = await res.text(); // Leemos como texto primero
-            let errorMsg = "Error desconocido en el chat.";
-            try {
-                // Intentamos parsear a JSON si el error viene de Python
-                const errorJson = JSON.parse(errorText);
-                errorMsg = errorJson.respuesta || errorText;
-            } catch(e) {
-                // Si falla, es un error de Azure (HTML/Gateway 502/504)
-                if (errorText.includes("Backend") || errorText.includes("502") || errorText.includes("504")) {
-                    errorMsg = "Intermitencia temporal en la conexión con el servidor. Por favor, intenta de nuevo.";
-                } else {
-                    errorMsg = "Error del servidor. Por favor, recarga la página.";
-                }
-            }
-            throw new Error(errorMsg);
+            const errorBody = await res.json();
+            throw new Error(errorBody.respuesta || "Error desconocido en el chat.");
         }
 
         const data = await res.json();
@@ -173,7 +122,7 @@ async function preguntar() {
                 respuestaHTML += `
                     <div class="source-link-item" style="font-size:0.85em; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; background:#fff; padding:6px; border:1px solid #ddd; border-radius:4px;">
                         <span title="${f.nombre}">📄 ${f.nombre.length > 40 ? f.nombre.substring(0,37)+'...' : f.nombre}</span>
-                        <a href="${f.link}" target="_blank" style="color:#0078d4; font-weight:bold; text-decoration:none; border:1px solid #0078d4; padding:2px 8px; border-radius:3px; font-size:0.9em;">Ver Archivo</a>
+                        <a href="${f.link}" target="_blank" style="color:#0078d4; font-weight:bold; text-decoration:none; border:1px solid #0078d4; padding:2px 8px; border-radius:3px; font-size:0.9em;">Ver PDF</a>
                     </div>`;
             });
             respuestaHTML += `</div>`;
@@ -183,23 +132,42 @@ async function preguntar() {
 
     } catch (e) {
         console.error("Error en chat:", e);
-        // Ahora el error no romperá la UI, sino que mostrará un mensaje amigable
-        addMessage("assistant", `⚠️ Ocurrió un problema: ${e.message}`, true);
+        addMessage("assistant", `⚠️ Ocurrió un problema: ${e.message}`);
     } finally {
-        if (loading) loading.style.display = 'none';
+        loading.style.display = 'none';
     }
 }
 
-// --- EVENTOS DEL TECLADO Y BOTONES ---
-document.addEventListener("DOMContentLoaded", () => {
-    const inputPregunta = document.getElementById('pregunta');
-    if (inputPregunta) {
-        // Escucha el evento "Enter" dentro de la caja de texto
-        inputPregunta.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault(); // Evita que la página se recargue
-                preguntar();
-            }
-        });
+// --- UTILIDADES DE RENDERIZADO ---
+
+function procesarMarkdown(texto) {
+    if (typeof texto !== 'string') return "Respuesta no disponible.";
+    
+    // Procesador básico para asegurar que el replace funcione siempre
+    return texto
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Negritas
+        .replace(/### (.*?)(<br>|$|\n)/g, '<h3 style="color:#0078d4; margin-bottom:5px;">$1</h3>') // Títulos
+        .replace(/\n/g, "<br>") // Saltos de línea
+        .replace(/- (.*?)(<br>|$)/g, '<li style="margin-left:15px;">$1</li>'); // Listas
+}
+
+function addMessage(role, text, isHTML = false) {
+    const chatWindow = document.getElementById('chat-window');
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+    
+    const bubble = document.createElement('div');
+    bubble.className = "bubble";
+    
+    if (isHTML) {
+        bubble.innerHTML = text;
+    } else {
+        bubble.textContent = text;
     }
-});
+    
+    div.appendChild(bubble);
+    chatWindow.appendChild(div);
+    
+    // Scroll automático al último mensaje
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+}
