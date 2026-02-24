@@ -145,10 +145,14 @@ function procesarMarkdown(texto) {
     
     // Procesador básico para asegurar que el replace funcione siempre
     return texto
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Negritas
-        .replace(/### (.*?)(<br>|$|\n)/g, '<h3 style="color:#0078d4; margin-bottom:5px;">$1</h3>') // Títulos
-        .replace(/\n/g, "<br>") // Saltos de línea
-        .replace(/- (.*?)(<br>|$)/g, '<li style="margin-left:15px;">$1</li>'); // Listas
+        .replace(/(^|\n|<br>)\s*#\s*(<br>|$|\n)/g, '') 
+        .replace(/### (.*?)(<br>|$|\n)/g, '<h3 style="color:#0078d4; margin-top:10px; margin-bottom:5px;">$1</h3>')
+        .replace(/## (.*?)(<br>|$|\n)/g, '<h4 style="color:#0078d4; margin-top:10px; margin-bottom:5px;">$1</h4>')
+        .replace(/# (.*?)(<br>|$|\n)/g, '<strong style="color:#0078d4; display:block; margin-top:10px;">$1</strong>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\n/g, "<br>")
+        .replace(/(<br>)- (.*?)(?=<br>|$)/g, '<li style="margin-left:15px;">$2</li>');
 }
 
 function addMessage(role, text, isHTML = false) {
