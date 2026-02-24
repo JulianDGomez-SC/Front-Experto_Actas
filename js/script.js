@@ -69,7 +69,25 @@ async function subir() {
     }
 }
 
-// --- MÓDULO 2: CHAT ESTRATÉGICO CON MEMORIA ---
+// Función mejorada para renderizar la respuesta de la IA (limpia símbolos y arregla títulos)
+function procesarMarkdown(texto) {
+    if (typeof texto !== 'string') return "Respuesta no disponible.";
+    return texto
+        // 1. Elimina el símbolo '#' cuando la IA lo deja solo en una línea
+        .replace(/(^|\n|<br>)\s*#\s*(<br>|$|\n)/g, '') 
+        // 2. Convierte títulos correctamente
+        .replace(/### (.*?)(<br>|$|\n)/g, '<h3 style="color:#0078d4; margin-top:10px; margin-bottom:5px;">$1</h3>')
+        .replace(/## (.*?)(<br>|$|\n)/g, '<h4 style="color:#0078d4; margin-top:10px; margin-bottom:5px;">$1</h4>')
+        .replace(/# (.*?)(<br>|$|\n)/g, '<strong style="color:#0078d4; display:block; margin-top:10px;">$1</strong>')
+        // 3. Negritas e itálicas
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        // 4. Saltos de línea y listas
+        .replace(/\n/g, "<br>")
+        .replace(/(<br>)- (.*?)(?=<br>|$)/g, '<li style="margin-left:15px;">$2</li>');
+}
+
+// Módulo 2 preguntando
 async function preguntar() {
     const input = document.getElementById('pregunta');
     const texto = input.value.trim();
@@ -95,9 +113,23 @@ async function preguntar() {
 
         if (res.status === 401) return redirigirALogin();
         
+        // --- MANEJO DE ERRORES BLINDADO ---
         if (!res.ok) {
-            const errorBody = await res.json();
-            throw new Error(errorBody.respuesta || "Error desconocido en el chat.");
+            const errorText = await res.text(); // Leemos como texto primero
+            let errorMsg = "Error desconocido en el chat.";
+            try {
+                // Intentamos parsear a JSON si el error viene de Python
+                const errorJson = JSON.parse(errorText);
+                errorMsg = errorJson.respuesta || errorText;
+            } catch(e) {
+                // Si falla, es un error de Azure (HTML/Gateway 502/504)
+                if (errorText.includes("Backend") || errorText.includes("502") || errorText.includes("504")) {
+                    errorMsg = "Intermitencia temporal en la conexión con el servidor. Por favor, intenta de nuevo.";
+                } else {
+                    errorMsg = "Error del servidor. Por favor, recarga la página.";
+                }
+            }
+            throw new Error(errorMsg);
         }
 
         const data = await res.json();
@@ -132,42 +164,9 @@ async function preguntar() {
 
     } catch (e) {
         console.error("Error en chat:", e);
+        // Ahora el error no romperá la UI, sino que mostrará un mensaje amigable
         addMessage("assistant", `⚠️ Ocurrió un problema: ${e.message}`);
     } finally {
         loading.style.display = 'none';
     }
-}
-
-// --- UTILIDADES DE RENDERIZADO ---
-
-function procesarMarkdown(texto) {
-    if (typeof texto !== 'string') return "Respuesta no disponible.";
-    
-    // Procesador básico para asegurar que el replace funcione siempre
-    return texto
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Negritas
-        .replace(/### (.*?)(<br>|$|\n)/g, '<h3 style="color:#0078d4; margin-bottom:5px;">$1</h3>') // Títulos
-        .replace(/\n/g, "<br>") // Saltos de línea
-        .replace(/- (.*?)(<br>|$)/g, '<li style="margin-left:15px;">$1</li>'); // Listas
-}
-
-function addMessage(role, text, isHTML = false) {
-    const chatWindow = document.getElementById('chat-window');
-    const div = document.createElement('div');
-    div.className = `msg ${role}`;
-    
-    const bubble = document.createElement('div');
-    bubble.className = "bubble";
-    
-    if (isHTML) {
-        bubble.innerHTML = text;
-    } else {
-        bubble.textContent = text;
-    }
-    
-    div.appendChild(bubble);
-    chatWindow.appendChild(div);
-    
-    // Scroll automático al último mensaje
-    chatWindow.scrollTop = chatWindow.scrollHeight;
 }
