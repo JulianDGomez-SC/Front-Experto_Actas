@@ -138,32 +138,31 @@ async function preguntar() {
     }
 }
 
-// --- UTILIDADES DE RENDERIZADO ---
 
+
+// --- MÓDULO 3: LIMPIEZA DE MARKDOWN DE LA IA ---
 function procesarMarkdown(texto) {
     if (typeof texto !== 'string') return "Respuesta no disponible.";
     
     return texto
-        // 1. ELIMINADOR DEFINITIVO DE '#': 
-        // Busca cualquier línea (^) que solo tenga un '#' seguido de espacios ($) y la borra.
-        .replace(/^#\s*$/gm, '') 
+        // 1. ELIMINADOR DE '#' SUELTOS: Borra si hay uno o varios '#' solos en una línea
+        .replace(/^#+\s*$/gm, '') 
         
-        // 2. Títulos (Headers)
-        .replace(/^### (.*$)/gm, '<h3 style="color:#0078d4; margin-top:10px; margin-bottom:5px;">$1</h3>')
-        .replace(/^## (.*$)/gm, '<h4 style="color:#0078d4; margin-top:10px; margin-bottom:5px;">$1</h4>')
-        .replace(/^# (.*$)/gm, '<strong style="color:#0078d4; display:block; margin-top:10px;">$1</strong>')
+        // 2. TÍTULOS DINÁMICOS (¡LA SOLUCIÓN!): 
+        // Atrapa desde 1 hasta 6 '#' seguidos de un espacio y les aplica el mismo estilo azul
+        .replace(/^#{1,6}\s+(.*$)/gm, '<h4 style="color:#0078d4; margin-top:15px; margin-bottom:5px; font-size:1.1em; font-weight:bold;">$1</h4>')
         
         // 3. Negritas e itálicas
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
         
-        // 4. Listas limpias (Convierte "- texto" a un elemento de lista)
+        // 4. Listas limpias
         .replace(/^- (.*$)/gm, '<li style="margin-left:15px; margin-bottom:5px;">$1</li>')
         
         // 5. Saltos de línea
         .replace(/\n/g, "<br>")
         
-        // 6. Limpieza visual (Elimina los espacios en blanco gigantes que dejan los '#' al ser borrados)
+        // 6. Limpieza visual (compacta los espacios en blanco múltiples)
         .replace(/(<br>\s*){3,}/g, '<br><br>');
 }
 
