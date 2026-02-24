@@ -143,16 +143,28 @@ async function preguntar() {
 function procesarMarkdown(texto) {
     if (typeof texto !== 'string') return "Respuesta no disponible.";
     
-    // Procesador básico para asegurar que el replace funcione siempre
     return texto
-        .replace(/(^|\n|<br>)\s*#\s*(<br>|$|\n)/g, '') 
-        .replace(/### (.*?)(<br>|$|\n)/g, '<h3 style="color:#0078d4; margin-top:10px; margin-bottom:5px;">$1</h3>')
-        .replace(/## (.*?)(<br>|$|\n)/g, '<h4 style="color:#0078d4; margin-top:10px; margin-bottom:5px;">$1</h4>')
-        .replace(/# (.*?)(<br>|$|\n)/g, '<strong style="color:#0078d4; display:block; margin-top:10px;">$1</strong>')
+        // 1. ELIMINADOR DEFINITIVO DE '#': 
+        // Busca cualquier línea (^) que solo tenga un '#' seguido de espacios ($) y la borra.
+        .replace(/^#\s*$/gm, '') 
+        
+        // 2. Títulos (Headers)
+        .replace(/^### (.*$)/gm, '<h3 style="color:#0078d4; margin-top:10px; margin-bottom:5px;">$1</h3>')
+        .replace(/^## (.*$)/gm, '<h4 style="color:#0078d4; margin-top:10px; margin-bottom:5px;">$1</h4>')
+        .replace(/^# (.*$)/gm, '<strong style="color:#0078d4; display:block; margin-top:10px;">$1</strong>')
+        
+        // 3. Negritas e itálicas
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        
+        // 4. Listas limpias (Convierte "- texto" a un elemento de lista)
+        .replace(/^- (.*$)/gm, '<li style="margin-left:15px; margin-bottom:5px;">$1</li>')
+        
+        // 5. Saltos de línea
         .replace(/\n/g, "<br>")
-        .replace(/(<br>)- (.*?)(?=<br>|$)/g, '<li style="margin-left:15px;">$2</li>');
+        
+        // 6. Limpieza visual (Elimina los espacios en blanco gigantes que dejan los '#' al ser borrados)
+        .replace(/(<br>\s*){3,}/g, '<br><br>');
 }
 
 function addMessage(role, text, isHTML = false) {
