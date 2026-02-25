@@ -140,12 +140,19 @@ async function preguntar() {
                     <span style="font-size: 0.9em; color: #666;">(1 = 😞 Pobre, errónea | 3 = 😐 Aceptable, parcial | 5 = 🤩 Excelente, exacta)</span>
                 </div>
                 <div class="stars-container" id="stars-${msgId}">
-                    <span class="star-btn" onclick="enviarCalificacion(5, '${msgId}', this)">★</span>
-                    <span class="star-btn" onclick="enviarCalificacion(4, '${msgId}', this)">★</span>
-                    <span class="star-btn" onclick="enviarCalificacion(3, '${msgId}', this)">★</span>
-                    <span class="star-btn" onclick="enviarCalificacion(2, '${msgId}', this)">★</span>
-                    <span class="star-btn" onclick="enviarCalificacion(1, '${msgId}', this)">★</span>
+                    <span class="star-btn" onclick="seleccionarCalificacion(5, '${msgId}', this)">★</span>
+                    <span class="star-btn" onclick="seleccionarCalificacion(4, '${msgId}', this)">★</span>
+                    <span class="star-btn" onclick="seleccionarCalificacion(3, '${msgId}', this)">★</span>
+                    <span class="star-btn" onclick="seleccionarCalificacion(2, '${msgId}', this)">★</span>
+                    <span class="star-btn" onclick="seleccionarCalificacion(1, '${msgId}', this)">★</span>
                 </div>
+
+                <div class="feedback-box" id="feedback-box-${msgId}">
+                    <span style="font-size:0.85em; font-weight:bold; color:#d13438; margin-bottom:5px;">¿En qué podemos mejorar esta respuesta?</span>
+                    <textarea class="feedback-textarea" id="feedback-text-${msgId}" placeholder="Ej: No mencionó la el acuerdo..., el dato del CAPEX está equivocado..."></textarea>
+                    <button class="feedback-btn" onclick="enviarFeedbackFinal('${msgId}')">Enviar Comentarios</button>
+                </div>
+
                 <div id="rating-thanks-${msgId}" style="display:none; color: #107c10; font-size: 0.9em; margin-top: 5px; font-weight: bold;">
                     ¡Gracias por ayudarnos a mejorar el modelo! 🚀
                 </div>
@@ -162,40 +169,75 @@ async function preguntar() {
     }
 }
 
-// --- ENVIAR CALIFICACIONES AL BACKEND ---
-async function enviarCalificacion(estrellas, msgId, starElement) {
+// --- MÓDULO 5: SISTEMA DE CALIFICACIONES CON FEEDBACK ---
+let currentRatings = {}; // Memoria temporal para saber cuántas estrellas eligió antes de escribir
+
+function seleccionarCalificacion(estrellas, msgId, starElement) {
+    // 1. Limpiamos selecciones previas y marcamos la actual
+    const allStars = document.querySelectorAll(`#stars-${msgId} .star-btn`);
+    allStars.forEach(s => s.classList.remove('selected'));
+    starElement.classList.add('selected');
+    
+    // Guardamos la elección temporalmente
+    currentRatings[msgId] = estrellas;
+    
+    const feedbackBox = document.getElementById(`feedback-box-${msgId}`);
+    
+    // 2. Lógica de decisión: ¿Muestra caja o envía directo?
+    if (estrellas <= 3) {
+        feedbackBox.style.display = 'flex'; // Mostrar textarea
+    } else {
+        feedbackBox.style.display = 'none'; // Ocultar textarea si se arrepintió y subió a 4 o 5
+        bloquearEstrellas(msgId);
+        ejecutarEnvioBackend(msgId, estrellas, ""); // Enviar sin feedback
+    }
+}
+
+function enviarFeedbackFinal(msgId) {
+    const feedbackText = document.getElementById(`feedback-text-${msgId}`).value.trim();
+    const estrellas = currentRatings[msgId];
+    
+    if (!feedbackText) {
+        alert("Por favor, déjanos un breve comentario para saber qué falló.");
+        document.getElementById(`feedback-text-${msgId}`).focus();
+        return;
+    }
+    
+    document.getElementById(`feedback-box-${msgId}`).style.display = 'none';
+    bloquearEstrellas(msgId);
+    ejecutarEnvioBackend(msgId, estrellas, feedbackText);
+}
+
+function bloquearEstrellas(msgId) {
+    const allStars = document.querySelectorAll(`#stars-${msgId} .star-btn`);
+    allStars.forEach(s => s.style.pointerEvents = 'none'); // Desactiva clics
+}
+
+async function ejecutarEnvioBackend(msgId, estrellas, feedback) {
     const container = document.getElementById(`rating-box-${msgId}`);
     if (!container) return;
     
-    // Extraemos la pregunta exacta que hizo el usuario
     const pregunta = container.getAttribute('data-pregunta');
     
-    // 1. Fijar el diseño visual (Bloquear clics adicionales y pintar de dorado)
-    const allStars = document.querySelectorAll(`#stars-${msgId} .star-btn`);
-    allStars.forEach(s => s.style.pointerEvents = 'none'); 
-    starElement.classList.add('selected'); 
-    
-    // 2. Mostrar mensaje de agradecimiento
+    // Mostrar agradecimiento
     document.getElementById(`rating-thanks-${msgId}`).style.display = 'block';
     
-    // 3. Enviar al backend de Python
     try {
         const res = await fetch(`${API_URL}/chat/rate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 pregunta: pregunta, 
-                estrellas: estrellas 
+                estrellas: estrellas,
+                feedback: feedback
             })
         });
         
         if(res.ok) {
-            console.log(`✅ Calificación de ${estrellas} estrellas guardada en Azure.`);
-        } else {
-            console.error("⚠️ El servidor respondió con un error al guardar la calificación.");
+            console.log(`✅ Guardado en Azure: ${estrellas} estrellas. Feedback: "${feedback}"`);
         }
     } catch (e) {
-        console.error("❌ Error de red enviando la calificación:", e);
+        console.error("❌ Error enviando calificación:", e);
     }
 }
 
