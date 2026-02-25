@@ -137,7 +137,7 @@ async function preguntar() {
             <div class="rating-box" id="rating-box-${msgId}" data-pregunta="${preguntaSegura}">
                 <div class="rating-rubric">
                     <strong>¿Qué tan útil y precisa fue esta respuesta?</strong><br>
-                    <span style="font-size: 0.9em; color: #666;">(1 = 😞 Pobre, errónea | 3 = 😐 Aceptable, parcial | 5 = 🤩 Excelente, exacta)</span>
+                    <span style="font-size: 0.9em; color: #666;">(1 = 😞 Pobre, errónea | 3 = 😐 Aceptable, parcial | 5 = 🤩 Aporta valor, clara)</span>
                 </div>
                 <div class="stars-container" id="stars-${msgId}">
                     <span class="star-btn" onclick="seleccionarCalificacion(5, '${msgId}', this)">★</span>
