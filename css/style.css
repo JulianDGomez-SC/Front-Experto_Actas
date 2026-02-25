@@ -346,6 +346,8 @@
     padding: 10px;
     border: 1px solid #e1dfdd;
     border-radius: 6px;
+    width: 100%; /* Asegura que no sobrepase su contenedor padre */
+    box-sizing: border-box;
 }
 
 .feedback-textarea {
