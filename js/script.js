@@ -128,6 +128,30 @@ async function preguntar() {
             respuestaHTML += `</div>`;
         }
 
+        // COMPONENTE DE CALIFICACIÓN (RÚBRICA Y ESTRELLAS)
+        const msgId = "msg_" + Date.now(); // Genera un ID único para la interacción
+        // Reemplazamos comillas en la pregunta para que no rompa el atributo HTML
+        const preguntaSegura = texto.replace(/"/g, '&quot;'); 
+
+        respuestaHTML += `
+            <div class="rating-box" id="rating-box-${msgId}" data-pregunta="${preguntaSegura}">
+                <div class="rating-rubric">
+                    <strong>¿Qué tan útil y precisa fue esta respuesta?</strong><br>
+                    <span style="font-size: 0.9em; color: #666;">(1 = 😞 Pobre, errónea | 3 = 😐 Aceptable, parcial | 5 = 🤩 Excelente, exacta)</span>
+                </div>
+                <div class="stars-container" id="stars-${msgId}">
+                    <span class="star-btn" onclick="enviarCalificacion(5, '${msgId}', this)">★</span>
+                    <span class="star-btn" onclick="enviarCalificacion(4, '${msgId}', this)">★</span>
+                    <span class="star-btn" onclick="enviarCalificacion(3, '${msgId}', this)">★</span>
+                    <span class="star-btn" onclick="enviarCalificacion(2, '${msgId}', this)">★</span>
+                    <span class="star-btn" onclick="enviarCalificacion(1, '${msgId}', this)">★</span>
+                </div>
+                <div id="rating-thanks-${msgId}" style="display:none; color: #107c10; font-size: 0.9em; margin-top: 5px; font-weight: bold;">
+                    ¡Gracias por ayudarnos a mejorar el modelo! 🚀
+                </div>
+            </div>
+        `;
+
         addMessage("assistant", respuestaHTML, true);
 
     } catch (e) {
@@ -138,7 +162,42 @@ async function preguntar() {
     }
 }
 
-
+// --- ENVIAR CALIFICACIONES AL BACKEND ---
+async function enviarCalificacion(estrellas, msgId, starElement) {
+    const container = document.getElementById(`rating-box-${msgId}`);
+    if (!container) return;
+    
+    // Extraemos la pregunta exacta que hizo el usuario
+    const pregunta = container.getAttribute('data-pregunta');
+    
+    // 1. Fijar el diseño visual (Bloquear clics adicionales y pintar de dorado)
+    const allStars = document.querySelectorAll(`#stars-${msgId} .star-btn`);
+    allStars.forEach(s => s.style.pointerEvents = 'none'); 
+    starElement.classList.add('selected'); 
+    
+    // 2. Mostrar mensaje de agradecimiento
+    document.getElementById(`rating-thanks-${msgId}`).style.display = 'block';
+    
+    // 3. Enviar al backend de Python
+    try {
+        const res = await fetch(`${API_URL}/chat/rate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                pregunta: pregunta, 
+                estrellas: estrellas 
+            })
+        });
+        
+        if(res.ok) {
+            console.log(`✅ Calificación de ${estrellas} estrellas guardada en Azure.`);
+        } else {
+            console.error("⚠️ El servidor respondió con un error al guardar la calificación.");
+        }
+    } catch (e) {
+        console.error("❌ Error de red enviando la calificación:", e);
+    }
+}
 
 // --- MÓDULO 3: LIMPIEZA DE MARKDOWN DE LA IA ---
 function procesarMarkdown(texto) {

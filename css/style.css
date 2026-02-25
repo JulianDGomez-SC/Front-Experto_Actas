@@ -290,3 +290,50 @@
  table {
      page-break-inside: auto;
  }
+
+ /* =========================================
+   SISTEMA DE CALIFICACIONES (ESTRELLAS)
+   ========================================= */
+.rating-box {
+    margin-top: 20px;
+    border-top: 1px dashed #d0d7de;
+    padding-top: 12px;
+    font-family: Arial, sans-serif;
+}
+
+.rating-rubric {
+    font-size: 0.85em;
+    color: #444;
+    margin-bottom: 5px;
+}
+
+.rating-rubric strong {
+    color: #0078d4;
+}
+
+.stars-container {
+    display: inline-flex;
+    flex-direction: row-reverse; /* Clave para el efecto Hover con CSS */
+    justify-content: flex-end;
+}
+
+.star-btn {
+    font-size: 1.8em;
+    color: #cbd5e1; /* Color gris por defecto */
+    cursor: pointer;
+    transition: color 0.2s;
+    user-select: none;
+    padding-right: 5px;
+}
+
+/* Efecto hover: Ilumina la estrella tocada y todas las que están a su izquierda */
+.star-btn:hover,
+.star-btn:hover ~ .star-btn {
+    color: #f1c40f; /* Dorado vibrante */
+}
+
+/* Fija el color cuando el usuario hace clic */
+.star-btn.selected,
+.star-btn.selected ~ .star-btn {
+    color: #f1c40f; 
+}
