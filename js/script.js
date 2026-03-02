@@ -94,6 +94,14 @@ async function preguntar() {
         });
 
         if (res.status === 401) return redirigirALogin();
+
+        //Leemos la respuesta como texto plano primero
+        const rawText = await res.text();
+
+        //Atrapar el mensaje de Azure ANTES de parsear
+        if (rawText.includes("Backend call failure") || rawText.includes("502") || rawText.includes("503")) {
+            throw new Error("El sistema se estaba despertando de su modo de ahorro de energía 😴. Por favor, haz clic en enviar nuevamente.");
+        }
         
         if (!res.ok) {
             const errorBody = await res.json();
