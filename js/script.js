@@ -70,82 +70,87 @@ async function subir() {
 }
 
 // --- MÓDULO 2: CHAT ESTRATÉGICO CON MEMORIA ---
+// --- MÓDULO 4: CHAT ---
 async function preguntar() {
     const input = document.getElementById('pregunta');
     const texto = input.value.trim();
     if (!texto) return;
 
-    // 1. Mostrar mensaje del usuario en la interfaz
     addMessage("user", texto);
     input.value = "";
     
     const loading = document.getElementById('loadingChat');
-    loading.style.display = 'block';
+    if (loading) loading.style.display = 'block';
 
     try {
-        // 2. Enviar pregunta E HISTORIAL al backend para mantener contexto
         const res = await fetch(`${API_URL}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                question: texto, 
-                history: chatHistory 
-            })
+            body: JSON.stringify({ question: texto, history: chatHistory })
         });
 
         if (res.status === 401) return redirigirALogin();
-
-        //Leemos la respuesta como texto plano primero
+        
+        // 1. BEBEMOS DEL RÍO UNA SOLA VEZ (Lo leemos todo como texto)
         const rawText = await res.text();
 
-        //Atrapar el mensaje de Azure ANTES de parsear
+        // Escudo 1: Azure despertando
         if (rawText.includes("Backend call failure") || rawText.includes("502") || rawText.includes("503")) {
             throw new Error("El sistema se estaba despertando de su modo de ahorro de energía 😴. Por favor, haz clic en enviar nuevamente.");
         }
-        
+
+        // Escudo 2: Errores del servidor
         if (!res.ok) {
-            const errorBody = await res.json();
-            throw new Error(errorBody.respuesta || "Error desconocido en el chat.");
+            let errorMsg = "Error del servidor.";
+            try {
+                errorMsg = JSON.parse(rawText).respuesta || rawText;
+            } catch(e) {
+                errorMsg = `Error en la conexión (HTTP ${res.status}).`;
+            }
+            throw new Error(errorMsg);
         }
 
-        const data = await res.json();
+        // 🚨 AQUÍ ESTABA EL DETALLE: 
+        // Usamos JSON.parse(rawText) en lugar de await res.json()
+        const data = JSON.parse(rawText);
         
-        // 3. Persistir en el historial local (Punto clave para la memoria)
+        // Memoria del chat
         chatHistory.push({ role: "user", content: texto });
         chatHistory.push({ role: "assistant", content: data.respuesta });
-        
-        // Mantener el historial ligero (últimas 5 interacciones = 10 mensajes)
         if (chatHistory.length > 10) chatHistory.splice(0, 2);
 
-        // 4. Renderizado de la respuesta (Markdown a HTML)
+        // Renderizado del Markdown
         let respuestaHTML = procesarMarkdown(data.respuesta);
 
-        // 5. Renderizado de Fuentes con Links SAS
+        // Agrupación de fuentes
         if (data.fuentes && data.fuentes.length > 0) {
             respuestaHTML += `
                 <div class="sources-box" style="margin-top:15px; border-top:2px solid #0078d4; padding-top:10px; background:#f9f9f9; padding:10px; border-radius:5px;">
-                    <strong style="color:#0078d4; display:block; margin-bottom:8px;">📚 Fuentes consultadas de Azure Search:</strong>`;
+                    <strong style="color:#0078d4; display:block; margin-bottom:8px;">📚 Fuentes consultadas:</strong>`;
             
+            let archivos_procesados = new Set();
             data.fuentes.forEach(f => {
-                respuestaHTML += `
-                    <div class="source-link-item" style="font-size:0.85em; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; background:#fff; padding:6px; border:1px solid #ddd; border-radius:4px;">
-                        <span title="${f.nombre}">📄 ${f.nombre.length > 40 ? f.nombre.substring(0,37)+'...' : f.nombre}</span>
-                        <a href="${f.link}" target="_blank" style="color:#0078d4; font-weight:bold; text-decoration:none; border:1px solid #0078d4; padding:2px 8px; border-radius:3px; font-size:0.9em;">Ver PDF</a>
-                    </div>`;
+                if (!archivos_procesados.has(f.nombre)) {
+                    respuestaHTML += `
+                        <div style="font-size:0.85em; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; background:#fff; padding:6px; border:1px solid #ddd; border-radius:4px;">
+                            <span title="${f.nombre}">📄 ${f.nombre.length > 40 ? f.nombre.substring(0,37)+'...' : f.nombre}</span>
+                            <a href="${f.link}" target="_blank" style="color:#0078d4; font-weight:bold; text-decoration:none; border:1px solid #0078d4; padding:2px 8px; border-radius:3px; font-size:0.9em;">Ver Archivo</a>
+                        </div>`;
+                    archivos_procesados.add(f.nombre);
+                }
             });
             respuestaHTML += `</div>`;
         }
 
-        // COMPONENTE DE CALIFICACIÓN (RÚBRICA Y ESTRELLAS)
-        const msgId = "msg_" + Date.now(); // Genera un ID único para la interacción
-        // Reemplazamos comillas en la pregunta para que no rompa el atributo HTML
+        // SISTEMA DE CALIFICACIÓN Y FEEDBACK
+        const msgId = "msg_" + Date.now(); 
         const preguntaSegura = texto.replace(/"/g, '&quot;'); 
 
         respuestaHTML += `
             <div class="rating-box" id="rating-box-${msgId}" data-pregunta="${preguntaSegura}">
                 <div class="rating-rubric">
                     <strong>¿Qué tan útil y precisa fue esta respuesta?</strong><br>
-                    <span style="font-size: 0.9em; color: #666;">(1 = 😞 Pobre, errónea | 3 = 😐 Aceptable, parcial | 5 = 🤩 Aporta valor, clara)</span>
+                    <span style="font-size: 0.9em; color: #666;">(1 = 😞 Pobre, errónea | 3 = 😐 Aceptable, parcial | 5 = 🤩 Excelente, exacta)</span>
                 </div>
                 <div class="stars-container" id="stars-${msgId}">
                     <span class="star-btn" onclick="seleccionarCalificacion(5, '${msgId}', this)">★</span>
@@ -154,14 +159,14 @@ async function preguntar() {
                     <span class="star-btn" onclick="seleccionarCalificacion(2, '${msgId}', this)">★</span>
                     <span class="star-btn" onclick="seleccionarCalificacion(1, '${msgId}', this)">★</span>
                 </div>
-
+                
                 <div class="feedback-box" id="feedback-box-${msgId}">
                     <span style="font-size:0.85em; font-weight:bold; color:#d13438; margin-bottom:5px;">¿En qué podemos mejorar esta respuesta?</span>
-                    <textarea class="feedback-textarea" id="feedback-text-${msgId}" placeholder="Ej: No mencionó la el acuerdo..., el dato del CAPEX está equivocado..."></textarea>
+                    <textarea class="feedback-textarea" id="feedback-text-${msgId}" placeholder="Ej: No mencionó el dato del presupuesto..."></textarea>
                     <button class="feedback-btn" onclick="enviarFeedbackFinal('${msgId}')">Enviar Comentarios</button>
                 </div>
 
-                <div id="rating-thanks-${msgId}" style="display:none; color: #107c10; font-size: 0.9em; margin-top: 5px; font-weight: bold;">
+                <div id="rating-thanks-${msgId}" style="display:none; color: #107c10; font-size: 0.9em; margin-top: 8px; font-weight: bold;">
                     ¡Gracias por ayudarnos a mejorar el modelo! 🚀
                 </div>
             </div>
@@ -170,10 +175,9 @@ async function preguntar() {
         addMessage("assistant", respuestaHTML, true);
 
     } catch (e) {
-        console.error("Error en chat:", e);
-        addMessage("assistant", `⚠️ Ocurrió un problema: ${e.message}`);
+        addMessage("assistant", `⚠️ ${e.message}`, true);
     } finally {
-        loading.style.display = 'none';
+        if (loading) loading.style.display = 'none';
     }
 }
 
