@@ -12,65 +12,76 @@ function redirigirALogin() {
 }
 
 // --- MÓDULO 1: GENERACIÓN DE ACTAS (DUAL) ---
+// --- 1. VARIABLE GLOBAL NUEVA (Ponla al principio de tu script.js) ---
+let documentosTemporales = []; 
+
+// --- 2. LA NUEVA FUNCIÓN SUBIR ---
 async function subir() {
     const fileInput = document.getElementById('fileInput');
-    const file = fileInput.files[0];
+    const files = fileInput.files;
     
-    if (!file) return alert("Por favor, selecciona un archivo (Transcripción o PDF).");
+    // Validaciones iniciales
+    if (files.length === 0) return alert("Por favor, selecciona al menos un archivo.");
+    if (files.length > 3) return alert("Solo puedes analizar un máximo de 3 archivos simultáneamente para no saturar la memoria.");
 
     const statusDiv = document.getElementById('statusUpload');
-    statusDiv.innerText = "⏳ Procesando en Azure Intelligence (Extrayendo Datos)...";
-    statusDiv.style.color = "#0078d4";
+    // Buscamos el contenedor visual para listar los archivos (lo crearemos en el HTML en el paso 2)
+    const listDiv = document.getElementById('tempFilesList'); 
+    
+    statusDiv.innerText = "⏳ Extrayendo texto en memoria (Seguro y Privado)...";
+    statusDiv.style.color = "var(--corp-primary)";
+    if (listDiv) listDiv.innerHTML = "";
 
+    // Preparamos los archivos para enviarlos al backend
     const formData = new FormData();
-    // Enviamos el archivo para ambos procesos (Transcripción y Layout)
-    formData.append("file_transcripcion", file);
-    formData.append("file_presentacion", file);
+    for (let i = 0; i < files.length; i++) {
+        formData.append("archivos", files[i]);
+    }
 
     try {
-        const res = await fetch(`${API_URL}/automatizacion/generar-acta-comite-dual`, {
+        // Apuntamos al nuevo endpoint de Python que NO guarda en Blob Storage
+        const res = await fetch(`${API_URL}/chat/analizar-temporales`, {
             method: 'POST',
             body: formData
         });
 
         if (res.status === 401) return redirigirALogin();
         
-        if (!res.ok) {
-            const errorText = await res.text();
-            throw new Error(`Error en el servidor: ${errorText}`);
-        }
+        const rawText = await res.text();
+        if (!res.ok) throw new Error(rawText);
 
-        // Recuperar el nombre del archivo desde los headers o asignar uno por defecto
-        const contentDisposition = res.headers.get('Content-Disposition');
-        let filename = `Acta_Borrador_${new Date().getTime()}.docx`;
-        if (contentDisposition && contentDisposition.includes('filename=')) {
-            filename = contentDisposition.split('filename=')[1].replace(/"/g, '');
-        }
+        const data = JSON.parse(rawText);
+        if (data.status === "error") throw new Error(data.mensaje);
 
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
+        // ✅ Guardamos el texto extraído en la variable global del navegador
+        documentosTemporales = data.documentos;
 
-        statusDiv.innerText = "✅ Acta generada y descargada exitosamente.";
+        statusDiv.innerText = `✅ ${files.length} archivo(s) listo(s) para consultar en el chat.`;
         statusDiv.style.color = "green";
         
-        // Limpiar input
-        fileInput.value = "";
+        // Dibujamos la lista de archivos para que el usuario sepa qué está leyendo la IA
+        if (listDiv) {
+            listDiv.innerHTML = `
+                <div style="text-align: left; background-color: #f0f4f8; padding: 10px; border-radius: 5px; margin-top: 10px; border-left: 3px solid var(--corp-accent);">
+                    <span style="color: var(--corp-primary); font-weight: bold; font-size: 0.9em;">
+                        <i class="fa-solid fa-memory me-1"></i> Documentos temporales en contexto:
+                    </span><br>
+                    <span style="font-size: 0.85em; color: #333;">
+                        ${documentosTemporales.map(d => `• ${d.nombre}`).join("<br>")}
+                    </span>
+                </div>`;
+        }
+        
+        // Limpiamos el input para que pueda subir otros si quiere
+        fileInput.value = ""; 
     } catch (e) {
-        console.error("Error en subida:", e);
+        console.error("Error en extracción:", e);
         statusDiv.innerText = `❌ Error: ${e.message}`;
-        statusDiv.style.color = "red";
+        statusDiv.style.color = "var(--corp-danger)";
     }
 }
 
 // --- MÓDULO 2: CHAT ESTRATÉGICO CON MEMORIA ---
-// --- MÓDULO 4: CHAT ---
 async function preguntar() {
     const input = document.getElementById('pregunta');
     const texto = input.value.trim();
@@ -86,7 +97,7 @@ async function preguntar() {
         const res = await fetch(`${API_URL}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ question: texto, history: chatHistory })
+            body: JSON.stringify({ question: texto, history: chatHistory,documentos_temporales: documentosTemporales })
         });
 
         if (res.status === 401) return redirigirALogin();

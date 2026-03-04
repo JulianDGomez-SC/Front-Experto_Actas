@@ -50,12 +50,13 @@
                         <div class="upload-zone border border-2 border-dashed rounded-3 p-3 text-center mb-3">
                             <i class="fa-solid fa-file-arrow-up fs-2 text-secondary mb-2"></i>
                             <input class="form-control form-control-sm mb-2" type="file" id="fileInput"
-                                accept=".pdf,.docx,.vtt,.doc">
+                                accept=".pdf,.docx,.vtt" multiple>
                             <button onclick="subir()" class="btn corporate-btn-outline w-100">
                                 <i class="fa-solid fa-microchip me-1"></i> Analizar Documento
                             </button>
                         </div>
                         <p id="statusUpload" class="mb-0 text-center fw-bold small" style="min-height: 20px;"></p>
+                        <div id="tempFilesList" class="mt-2 text-success small text-center" style="font-weight: 500;"></div>
                     </div>
                 </div>
 
